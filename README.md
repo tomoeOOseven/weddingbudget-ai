@@ -3,6 +3,12 @@
 AI-powered wedding budget estimator for the Indian high-end wedding market.
 Built for the WedTech Innovation Challenge by Events by Athea.
 
+## Repository Description
+
+End-to-end wedding budget intelligence platform with a React frontend,
+Node/Express backend, Supabase data layer, and optional Python ML service
+for decor cost prediction.
+
 ## Architecture
 
 ```
@@ -59,3 +65,10 @@ Smart Input Wizard · Décor Library (AI) · Logistics Engine · Artist Cost Map
 F&B Module · Sundries · Budget Report · PDF Export · Scenario Comparison ·
 Budget Tracker · Scraping Pipeline (20 sites) · Admin Labelling UI · ML Training Pipeline ·
 Cost Data Management · Audit Log · Client Auth · Row Level Security
+
+## Open Source Metadata
+
+- License: Apache-2.0 (see LICENSE)
+- Contributing guide: CONTRIBUTING.md
+- Security policy: SECURITY.md
+- Code of conduct: .github/CODE_OF_CONDUCT.md
