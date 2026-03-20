@@ -72,7 +72,8 @@ router.delete('/artists/:id', requireAdmin, async (req, res) => {
 
 // ── MEALS ─────────────────────────────────────────────────────────────────────
 router.get('/meals', requireAdmin, async (req, res) => {
-  const { data } = await supabaseAdmin.from('meals').select('*');
+  const { data, error } = await supabaseAdmin.from('meals').select('*');
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ meals: data ?? [] });
 });
 router.put('/meals/:id', requireAdmin, async (req, res) => {
@@ -83,7 +84,8 @@ router.put('/meals/:id', requireAdmin, async (req, res) => {
 
 // ── BAR TIERS ─────────────────────────────────────────────────────────────────
 router.get('/bar-tiers', requireAdmin, async (req, res) => {
-  const { data } = await supabaseAdmin.from('bar_tiers').select('*');
+  const { data, error } = await supabaseAdmin.from('bar_tiers').select('*');
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ barTiers: data ?? [] });
 });
 router.put('/bar-tiers/:id', requireAdmin, async (req, res) => {
@@ -94,7 +96,8 @@ router.put('/bar-tiers/:id', requireAdmin, async (req, res) => {
 
 // ── SPECIALTY COUNTERS ────────────────────────────────────────────────────────
 router.get('/specialty-counters', requireAdmin, async (req, res) => {
-  const { data } = await supabaseAdmin.from('specialty_counters').select('*');
+  const { data, error } = await supabaseAdmin.from('specialty_counters').select('*');
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ counters: data ?? [] });
 });
 router.put('/specialty-counters/:id', requireAdmin, async (req, res) => {
@@ -105,7 +108,8 @@ router.put('/specialty-counters/:id', requireAdmin, async (req, res) => {
 
 // ── LOGISTICS ─────────────────────────────────────────────────────────────────
 router.get('/logistics', requireAdmin, async (req, res) => {
-  const { data } = await supabaseAdmin.from('logistics_rates').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1);
+  const { data, error } = await supabaseAdmin.from('logistics_rates').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1);
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ logistics: data?.[0] ?? null });
 });
 router.put('/logistics/:id', requireAdmin, async (req, res) => {
@@ -116,7 +120,8 @@ router.put('/logistics/:id', requireAdmin, async (req, res) => {
 
 // ── SFX ───────────────────────────────────────────────────────────────────────
 router.get('/sfx', requireAdmin, async (req, res) => {
-  const { data } = await supabaseAdmin.from('sfx_items').select('*');
+  const { data, error } = await supabaseAdmin.from('sfx_items').select('*');
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ sfx: data ?? [] });
 });
 router.put('/sfx/:id', requireAdmin, async (req, res) => {
@@ -127,7 +132,8 @@ router.put('/sfx/:id', requireAdmin, async (req, res) => {
 
 // ── SUNDRIES ──────────────────────────────────────────────────────────────────
 router.get('/sundries', requireAdmin, async (req, res) => {
-  const { data } = await supabaseAdmin.from('sundries_config').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1);
+  const { data, error } = await supabaseAdmin.from('sundries_config').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1);
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ sundries: data?.[0] ?? null });
 });
 router.put('/sundries/:id', requireAdmin, async (req, res) => {

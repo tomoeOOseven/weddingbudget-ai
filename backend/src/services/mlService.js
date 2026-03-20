@@ -68,11 +68,16 @@ async function embedImage(imageId, imageUrl, storagePath = null) {
  * @param {string} triggeredBy   — admin profile UUID
  */
 async function triggerTraining(versionLabel, triggeredBy = null) {
-  const { data } = await axios.post(`${ML_URL}/train`, {
-    version_label: versionLabel,
-    triggered_by:  triggeredBy,
-  }, { timeout: 10000 });
-  return data;
+  try {
+    const { data } = await axios.post(`${ML_URL}/train`, {
+      version_label: versionLabel,
+      triggered_by:  triggeredBy,
+    }, { timeout: 10000 });
+    return data;
+  } catch (err) {
+    console.error('[mlService] triggerTraining failed:', err.message);
+    return null;
+  }
 }
 
 /**

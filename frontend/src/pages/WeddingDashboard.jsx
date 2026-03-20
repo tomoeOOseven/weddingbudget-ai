@@ -1,19 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { supabase } from '../lib/supabase.js';
+import { getToken } from '../lib/tokenStore.js';
+import { fetchWeddings, createWedding } from '../api.js';
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
-
-async function apiFetch(path, opts = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch(`${API}${path}`, {
-    ...opts,
-    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${session?.access_token}`, ...(opts.headers ?? {}) },
-  });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed'); }
-  return res.json();
-}
 
 function fmt(n) { return n ? '₹' + Number(n).toLocaleString('en-IN') : '—'; }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : null; }
@@ -28,7 +19,7 @@ export default function WeddingDashboard({ onSelectWedding }) {
   const [creating, setCreating]   = useState(false);
 
   useEffect(() => {
-    apiFetch('/api/weddings')
+    fetchWeddings()
       .then(d => setWeddings(d.weddings ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -38,14 +29,11 @@ export default function WeddingDashboard({ onSelectWedding }) {
     e.preventDefault();
     setCreating(true);
     try {
-      const data = await apiFetch('/api/weddings', {
-        method: 'POST',
-        body: JSON.stringify({
-          name:          form.name,
-          weddingDate:   form.weddingDate || null,
-          totalGuests:   form.totalGuests ? parseInt(form.totalGuests) : null,
-          roomsBlocked:  form.roomsBlocked ? parseInt(form.roomsBlocked) : null,
-        }),
+      const data = await createWedding({
+        name:          form.name,
+        weddingDate:   form.weddingDate || null,
+        totalGuests:   form.totalGuests ? parseInt(form.totalGuests) : null,
+        roomsBlocked:  form.roomsBlocked ? parseInt(form.roomsBlocked) : null,
       });
       setWeddings(w => [data.wedding, ...w]);
       setShowCreate(false);

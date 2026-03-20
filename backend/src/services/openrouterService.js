@@ -3,16 +3,23 @@
 // Sends a scraped decor image to a vision-capable model via OpenRouter.
 // Returns structured tags: function_type, style, complexity, cost estimates.
 //
-// Primary model: claude-sonnet-4-20250514 (best image understanding)
-// Fallback model: google/gemini-flash-1.5  (cheaper, fast)
+// Primary model: google/gemma-3-27b-it:free
+// Fallbacks: gemma-3-12b-it:free → nemotron-nano-12b-v2-vl:free
+//            mistral-small-3.1-24b-instruct:free → gemma-3-4b-it:free
 // ─────────────────────────────────────────────────────────────────────────────
 
 const axios = require('axios');
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-const PRIMARY_MODEL  = process.env.OPENROUTER_MODEL  ?? 'anthropic/claude-sonnet-4-20250514';
-const FALLBACK_MODEL = 'google/gemini-flash-1.5';
+const PRIMARY_MODEL = process.env.OPENROUTER_MODEL ?? 'google/gemma-3-27b-it:free';
+const FALLBACK_MODEL = process.env.OPENROUTER_FALLBACK_MODEL ?? 'google/gemma-3-12b-it:free';
+const SECONDARY_FALLBACK_MODEL =
+  process.env.OPENROUTER_SECONDARY_FALLBACK_MODEL ?? 'nvidia/nemotron-nano-12b-v2-vl:free';
+const FOURTH_FALLBACK_MODEL =
+  process.env.OPENROUTER_FOURTH_FALLBACK_MODEL ?? 'mistralai/mistral-small-3.1-24b-instruct:free';
+const FIFTH_FALLBACK_MODEL =
+  process.env.OPENROUTER_FIFTH_FALLBACK_MODEL ?? 'google/gemma-3-4b-it:free';
 
 // Valid enum values — must match the DB enums exactly
 const VALID_FUNCTIONS   = ['haldi', 'mehendi', 'sangeet', 'baraat', 'pheras', 'reception', 'other'];
@@ -111,11 +118,50 @@ function parseModelResponse(rawData) {
   // Strip markdown code fences if model wraps in ```json
   const cleaned = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
 
-  let parsed;
+  let parsed = null;
+
+  // Attempt 1: direct parse
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    throw new Error(`Model returned non-JSON: ${content.slice(0, 200)}`);
+    // Attempt 2: parse the largest JSON-looking slice
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      const sliced = cleaned.slice(firstBrace, lastBrace + 1)
+        // Remove trailing commas before object/array close.
+        .replace(/,\s*([}\]])/g, '$1');
+      try {
+        parsed = JSON.parse(sliced);
+      } catch {
+        parsed = null;
+      }
+    }
+  }
+
+  // Attempt 3: field-level extraction for partially malformed JSON outputs
+  if (!parsed) {
+    parsed = {
+      function_type: (cleaned.match(/"function_type"\s*:\s*"([^"]+)"/i)?.[1] ?? 'other'),
+      style: (cleaned.match(/"style"\s*:\s*"([^"]+)"/i)?.[1] ?? 'Traditional'),
+      complexity: (cleaned.match(/"complexity"\s*:\s*"([^"]+)"/i)?.[1] ?? 'medium'),
+      cost_seed_min: parseInt(cleaned.match(/"cost_seed_min"\s*:\s*([0-9]+)/i)?.[1] ?? '0', 10),
+      cost_seed_max: parseInt(cleaned.match(/"cost_seed_max"\s*:\s*([0-9]+)/i)?.[1] ?? '0', 10),
+      confidence: parseFloat(cleaned.match(/"confidence"\s*:\s*([0-9]*\.?[0-9]+)/i)?.[1] ?? '0.7'),
+      reasoning: (cleaned.match(/"reasoning"\s*:\s*"([\s\S]*?)"\s*[,}]/i)?.[1] ?? '').slice(0, 500),
+    };
+
+    // If no useful signals were found at all, fail loudly.
+    const extractedAny =
+      /"function_type"\s*:/i.test(cleaned) ||
+      /"style"\s*:/i.test(cleaned) ||
+      /"complexity"\s*:/i.test(cleaned) ||
+      /"cost_seed_min"\s*:/i.test(cleaned) ||
+      /"cost_seed_max"\s*:/i.test(cleaned);
+
+    if (!extractedAny) {
+      throw new Error(`Model returned non-JSON: ${content.slice(0, 200)}`);
+    }
   }
 
   // Validate and sanitise fields
@@ -154,7 +200,13 @@ function parseModelResponse(rawData) {
 async function autoTagImage(image) {
   let lastError;
 
-  for (const model of [PRIMARY_MODEL, FALLBACK_MODEL]) {
+  for (const model of [
+    PRIMARY_MODEL,
+    FALLBACK_MODEL,
+    SECONDARY_FALLBACK_MODEL,
+    FOURTH_FALLBACK_MODEL,
+    FIFTH_FALLBACK_MODEL,
+  ]) {
     try {
       const rawData = await callVisionModel(image, model);
 

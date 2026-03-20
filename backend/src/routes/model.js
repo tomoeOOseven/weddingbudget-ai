@@ -22,6 +22,7 @@ router.post('/train', requireAdmin, async (req, res) => {
 
   try {
     const data = await triggerTraining(versionLabel.trim(), req.profile.id);
+    if (data === null) return res.status(503).json({ error: 'ML service is unavailable. Start the ml_service and try again.' });
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: `ML service error: ${err.message}` });
@@ -37,11 +38,13 @@ router.post('/promote/:id', requireAdmin, async (req, res) => {
   if (version.status !== 'ready') return res.status(400).json({ error: 'Can only promote ready versions.' });
 
   // Deactivate current active
-  await supabaseAdmin.from('model_versions').update({ is_active: false }).eq('is_active', true);
+  const { error: deactivateErr } = await supabaseAdmin.from('model_versions').update({ is_active: false }).eq('is_active', true);
+  if (deactivateErr) return res.status(500).json({ error: deactivateErr.message });
 
   // Promote
-  const { data } = await supabaseAdmin
+  const { data, error: promoteErr } = await supabaseAdmin
     .from('model_versions').update({ is_active: true }).eq('id', req.params.id).select().single();
+  if (promoteErr) return res.status(500).json({ error: promoteErr.message });
 
   res.json({ version: data, message: `Version ${data.version_label} is now active.` });
 });

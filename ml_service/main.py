@@ -285,8 +285,8 @@ def _run_training(version_id: str, run_id: str, version_label: str):
             .eq('is_in_training', True).execute()
 
         labels = labels_resp.data
-        if len(labels) < 20:
-            raise ValueError(f'Not enough labelled data: {len(labels)} rows (need ≥20).')
+        if len(labels) < 10:
+            raise ValueError(f'Not enough labelled data: {len(labels)} rows (need >=10).')
 
         _append_log(run_id, f'Loaded {len(labels)} labelled images.')
 
@@ -450,15 +450,22 @@ def predict(req: PredictRequest):
     else:
         cost_min, cost_max, confidence, source = _rule_based_estimate(row)
 
-    # Log inference
-    supabase.table('inference_log').insert({
-        'model_version_id': _active_version_id or '00000000-0000-0000-0000-000000000000',
-        'image_id':         req.image_id,
-        'input_features':   row,
-        'predicted_min':    int(cost_min),
-        'predicted_max':    int(cost_max),
-        'confidence':       confidence,
-    }).execute()
+    # Log inference only when a valid model version exists.
+    # The DB schema requires model_version_id to reference model_versions(id).
+    if _active_version_id:
+        try:
+            supabase.table('inference_log').insert({
+                'model_version_id': _active_version_id,
+                'image_id':         req.image_id,
+                'input_features':   row,
+                'predicted_min':    int(cost_min),
+                'predicted_max':    int(cost_max),
+                'confidence':       confidence,
+            }).execute()
+        except Exception as e:
+            log.warning(f'Failed to log inference: {e}')
+    else:
+        log.warning('Skipping inference log because no active model version is available.')
 
     return {
         'cost_min':   int(cost_min),

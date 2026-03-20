@@ -4,17 +4,20 @@ const router  = express.Router();
 const { supabase } = require('../lib/supabaseClient');
 
 router.get('/meals', async (req, res) => {
-  const { data } = await supabase.from('meals').select('*').eq('is_active', true);
+  const { data, error } = await supabase.from('meals').select('*').eq('is_active', true);
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ meals: data ?? [] });
 });
 
 router.get('/bar-tiers', async (req, res) => {
-  const { data } = await supabase.from('bar_tiers').select('*').eq('is_active', true);
+  const { data, error } = await supabase.from('bar_tiers').select('*').eq('is_active', true);
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ barTiers: data ?? [] });
 });
 
 router.get('/specialty-counters', async (req, res) => {
-  const { data } = await supabase.from('specialty_counters').select('*').eq('is_active', true);
+  const { data, error } = await supabase.from('specialty_counters').select('*').eq('is_active', true);
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ counters: data ?? [] });
 });
 

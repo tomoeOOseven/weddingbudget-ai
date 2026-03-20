@@ -53,7 +53,7 @@ const S = {
 };
 
 export default function AdminLogin() {
-  const { signIn, isAdmin, loading } = useAuth();
+  const { signIn, signOut, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -84,13 +84,17 @@ export default function AdminLogin() {
       return;
     }
 
-    // After sign-in, AuthContext fetches profile. Give it a moment then check role.
-    // (onAuthStateChange will update isAdmin, which triggers the useEffect above.)
-    // If the user signed in but isn't an admin, show a clear message.
+    // Give AuthContext one tick to update profile + isAdmin from onAuthStateChange,
+    // then check if the signed-in user actually has admin access.
     setTimeout(() => {
-      // This runs after the auth state update cycle
       setSubmitting(false);
-    }, 500);
+      // isAdmin is derived from the profile that AuthContext just fetched.
+      // If it's still false at this point, the account doesn't have admin rights.
+      if (!isAdmin) {
+        setError('This account does not have admin access. Contact a super-admin.');
+        signOut();
+      }
+    }, 800);
   }
 
   return (

@@ -23,6 +23,9 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
     return fnOk && tabOk && styleOk;
   });
 
+  // Stable key: sorted IDs joined — changes whenever any item is added, removed, or swapped
+  const selectedKey = [...inputs.selectedDecors].sort().join(',');
+
   // ML-score selections on change
   useEffect(() => {
     const selected = [...inputs.selectedDecors];
@@ -44,7 +47,7 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
       })
       .catch(() => {})
       .finally(() => setScoring(false));
-  }, [inputs.selectedDecors.size, inputs.city, inputs.hotelTier]);
+  }, [selectedKey, inputs.city, inputs.hotelTier]);
 
   function getCostRange(d) {
     const ml = mlScores[d.id];

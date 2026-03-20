@@ -11,9 +11,7 @@ const { requireAuth }     = require('../middleware/authMiddleware');
 let _refData = null, _refDataAt = 0;
 async function getRefData() {
   if (_refData && Date.now() - _refDataAt < 600000) return _refData;
-  const { data } = await supabase.from('cities').select('*').eq('is_active', true);
-  // Full load via internal fetch (reuses /api/data/all logic)
-  // Simpler: rebuild inline from Supabase directly
+  // Full load via Supabase directly
   const [
     { data: cities }, { data: hotelTiers }, { data: artists }, { data: meals },
     { data: barTiers }, { data: specialtyCounters }, { data: lr }, { data: sfxItems },

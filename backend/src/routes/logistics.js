@@ -4,12 +4,14 @@ const router  = express.Router();
 const { supabase } = require('../lib/supabaseClient');
 
 router.get('/rates', async (req, res) => {
-  const { data } = await supabase.from('logistics_rates').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1);
+  const { data, error } = await supabase.from('logistics_rates').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1);
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ rates: data?.[0] ?? null });
 });
 
 router.get('/sfx', async (req, res) => {
-  const { data } = await supabase.from('sfx_items').select('*').eq('is_active', true);
+  const { data, error } = await supabase.from('sfx_items').select('*').eq('is_active', true);
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ sfxItems: data ?? [] });
 });
 

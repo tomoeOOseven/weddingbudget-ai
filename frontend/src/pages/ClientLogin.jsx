@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const S = {
   page: { minHeight:'100vh', background:'var(--cream)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Jost',sans-serif", padding:20 },
@@ -17,6 +18,7 @@ const S = {
 };
 
 export default function ClientLogin() {
+  const { user, loading: authLoading } = useAuth();
   const [mode, setMode]       = useState('login'); // 'login' | 'signup'
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
@@ -26,12 +28,10 @@ export default function ClientLogin() {
   const [ok, setOk]           = useState('');
   const navigate = useNavigate();
 
-  // Redirect if already logged in as client
+  // Redirect if already logged in — uses AuthContext, no extra getSession() call
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/', { replace: true });
-    });
-  }, []);
+    if (!authLoading && user) navigate('/', { replace: true });
+  }, [authLoading, user]);
 
   async function handleSubmit(e) {
     e.preventDefault();

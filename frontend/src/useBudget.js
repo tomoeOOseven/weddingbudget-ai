@@ -136,8 +136,8 @@ export function useBudget(refData) {
     if (inputs.gifts)       { sMin += inputs.guests  * (S.giftPerGuestMin      ?? 500);  sMax += inputs.guests  * (S.giftPerGuestMax      ?? 1500); }
     if (inputs.stationery)  { sMin += inputs.guests  * (S.stationeryPerGuestMin?? 200);  sMax += inputs.guests  * (S.stationeryPerGuestMax?? 500);  }
     if (inputs.photography) { sMin += (S.photographyMin ?? 180000) * cm;                sMax += (S.photographyMax ?? 550000) * cm; }
-    const subtotalMin = items.reduce((t, i) => t + i.min, 0) + sMin;
-    const subtotalMax = items.reduce((t, i) => t + i.max, 0) + sMax;
+    const subtotalMin = items.reduce((t, i) => t + i.min, 0);
+    const subtotalMax = items.reduce((t, i) => t + i.max, 0);
     sMin += subtotalMin * (S.contingencyPct ?? 0.05);
     sMax += subtotalMax * (S.contingencyPct ?? 0.05);
     if (sMin > 0) items.push({ cat:'Sundries & Extras', sub:'Gifts · Photography · Contingency', min:sMin, max:sMax });

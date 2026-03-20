@@ -25,9 +25,11 @@ export default function App() {
     fetchReferenceData()
       .then(d => { setRefData(d); setDataLoading(false); })
       .catch(() => {
-        import('./fallbackData.js').then(m => setRefData(m.default));
-        setApiError(true);
-        setDataLoading(false);
+        import('./fallbackData.js').then(m => {
+          setRefData(m.default);
+          setApiError(true);
+          setDataLoading(false);
+        });
       });
   }, []);
 

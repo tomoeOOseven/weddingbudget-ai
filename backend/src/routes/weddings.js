@@ -16,7 +16,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /api/weddings — create a new wedding
 router.post('/', requireAuth, async (req, res) => {
-  const { name, weddingDate, citySlug, hotelTierSlug, roomsBlocked, totalGuests, outstationPct, bridgeHometown, groomHometown, notes } = req.body;
+  const { name, weddingDate, citySlug, hotelTierSlug, roomsBlocked, totalGuests, outstationPct, brideHometown, groomHometown, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required.' });
 
   // Resolve city and hotel IDs from slugs
@@ -34,7 +34,7 @@ router.post('/', requireAuth, async (req, res) => {
     rooms_blocked:  roomsBlocked ?? null,
     total_guests:   totalGuests ?? null,
     outstation_pct: outstationPct ?? 0,
-    bride_hometown: bridgeHometown ?? null,
+    bride_hometown: brideHometown ?? null,
     groom_hometown: groomHometown ?? null,
     notes:          notes ?? null,
   }).select().single();

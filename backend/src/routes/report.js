@@ -6,7 +6,7 @@ const { generateBudgetXLSX } = require('../services/excelService');
 
 // ── XLSX Export ────────────────────────────────────────────────────────────
 // POST /api/report/xlsx
-router.post('/xlsx', async (req, res) => {
+router.post('/xlsx', requireAuth, async (req, res) => {
   try {
     const { items = [], summary = {}, meta = {}, actuals = [] } = req.body;
     const buffer = await generateBudgetXLSX({ items, summary, meta, actuals });
@@ -18,7 +18,7 @@ router.post('/xlsx', async (req, res) => {
   }
 });
 // POST /api/report/pdf — generate PDF, return as buffer
-router.post('/pdf', async (req, res) => {
+router.post('/pdf', requireAuth, async (req, res) => {
   try {
     // Generate HTML for PDF
     const { items, summary, meta, inputs } = req.body;
@@ -111,6 +111,17 @@ router.post('/actuals', requireAuth, async (req, res) => {
 
 // PUT /api/report/actuals/:id
 router.put('/actuals/:id', requireAuth, async (req, res) => {
+  // Verify ownership before updating
+  const { data: existing, error: fetchError } = await supabaseAdmin
+    .from('budget_actuals')
+    .select('wedding_id, weddings!inner(client_id)')
+    .eq('id', req.params.id)
+    .single();
+  if (fetchError || !existing) return res.status(404).json({ error: 'Actual not found.' });
+  if (existing.weddings.client_id !== req.profile.id && req.profile.role !== 'admin' && req.profile.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Not authorised to edit this record.' });
+  }
+
   const allowed = ['actual_amount', 'vendor_name', 'invoice_reference', 'paid_date', 'notes'];
   const updates = {};
   allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
@@ -122,6 +133,17 @@ router.put('/actuals/:id', requireAuth, async (req, res) => {
 
 // DELETE /api/report/actuals/:id
 router.delete('/actuals/:id', requireAuth, async (req, res) => {
+  // Verify ownership before deleting
+  const { data: existing, error: fetchError } = await supabaseAdmin
+    .from('budget_actuals')
+    .select('wedding_id, weddings!inner(client_id)')
+    .eq('id', req.params.id)
+    .single();
+  if (fetchError || !existing) return res.status(404).json({ error: 'Actual not found.' });
+  if (existing.weddings.client_id !== req.profile.id && req.profile.role !== 'admin' && req.profile.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Not authorised to delete this record.' });
+  }
+
   const { error } = await supabaseAdmin.from('budget_actuals').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ message: 'Deleted.' });

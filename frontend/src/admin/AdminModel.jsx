@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase.js';
+import { getToken } from '../lib/tokenStore.js';
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 async function apiFetch(path, opts = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = getToken();
   const res = await fetch(`${API}${path}`, {
     ...opts,
-    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${token}`, ...(opts.headers ?? {}) },
+    headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}), ...(opts.headers ?? {}) },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));

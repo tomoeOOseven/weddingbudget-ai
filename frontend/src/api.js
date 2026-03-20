@@ -1,15 +1,10 @@
 // api.js — all backend calls, auth-aware
-import { supabase } from './lib/supabase.js';
+import { getToken } from './lib/tokenStore.js';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-async function getToken() {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? null;
-}
-
 async function request(path, options = {}) {
-  const token = await getToken();
+  const token = getToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
@@ -21,7 +16,18 @@ async function request(path, options = {}) {
 }
 
 export const fetchReferenceData  = () => request('/api/data/all');
-export const calculateEstimate   = (inputs) => request('/api/estimate', { method:'POST', body: JSON.stringify(inputs) });
+export const calculateEstimate   = (inputs) => request('/api/estimate', {
+  method: 'POST',
+  body: JSON.stringify({
+    ...inputs,
+    functions:         [...inputs.functions],
+    selectedDecors:    [...inputs.selectedDecors],
+    selectedArtists:   [...inputs.selectedArtists],
+    selectedMeals:     [...inputs.selectedMeals],
+    specialtyCounters: [...inputs.specialtyCounters],
+    sfx:               [...inputs.sfx],
+  }),
+});
 export const quickEstimate       = (inputs) => request('/api/estimate/quick', { method:'POST', body: JSON.stringify(inputs) });
 export const fetchDecor          = (p = {}) => request(`/api/decor?${new URLSearchParams(p)}`);
 export const fetchScrapedDecor   = (p = {}) => request(`/api/decor/scraped?${new URLSearchParams(p)}`);
@@ -41,7 +47,7 @@ export const fetchScenarios      = (wid) => request(`/api/report/scenarios/${wid
 export const saveScenario        = (data) => request('/api/report/scenarios', { method:'POST', body: JSON.stringify(data) });
 
 export const downloadPDF = async (payload) => {
-  const token = await getToken();
+  const token = getToken();
   const res = await fetch(`${BASE}/api/report/pdf`, {
     method:'POST',
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) },
@@ -52,7 +58,7 @@ export const downloadPDF = async (payload) => {
 };
 
 export const downloadXLSX = async (payload) => {
-  const token = await getToken();
+  const token = getToken();
   const res = await fetch(`${BASE}/api/report/xlsx`, {
     method:'POST',
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) },
