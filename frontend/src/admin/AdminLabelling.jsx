@@ -5,7 +5,7 @@ import { fetchFromApi } from '../lib/apiBase.js';
 const FUNCTIONS    = ['haldi','mehendi','sangeet','baraat','pheras','reception','other'];
 const STYLES       = ['Traditional','Boho','Modern','Contemporary','Romantic','Opulent','Rustic','Vintage'];
 const COMPLEXITIES = ['low','medium','high','ultra'];
-const FN_EMOJI     = { haldi:'💛', mehendi:'🌿', sangeet:'🎵', baraat:'🐴', pheras:'🔥', reception:'✨', other:'📷' };
+// FN_EMOJI removed: no emoji for function labels (professional style)
 const COMPLEXITY_COLOR = { low:'#16a34a', medium:'#d97706', high:'#dc2626', ultra:'#7c3aed' };
 
 async function apiFetch(path, opts = {}) {
@@ -113,7 +113,7 @@ function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Lab
           <label style={S.label}>Function</label>
           <select style={S.sel} value={form.function_type} onChange={e => set('function_type', e.target.value)}>
             <option value="">Select…</option>
-            {FUNCTIONS.map(f => <option key={f} value={f}>{FN_EMOJI[f]} {f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
+            {FUNCTIONS.map(f => <option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
           </select>
         </div>
         <div style={{ flex:1 }}>
@@ -266,7 +266,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
             <button style={tabStyle(tab==='ai')} onClick={() => setTab('ai')}>AI Auto-Tag</button>
             {suggestion && (
               <button style={tabStyle(tab==='suggestion')} onClick={() => setTab('suggestion')}>
-                🔔 Review Suggestion
+                Review Suggestion
               </button>
             )}
           </div>
@@ -287,8 +287,8 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
               <div style={{ background:'#f9f5ef', border:'1px solid #e8d5b0', borderRadius:10,
                 padding:'12px 16px', marginBottom:16, fontSize:12, color:'#7a1c1c' }}>
                 {bypass
-                  ? '⚡ Auto-approve mode — tags will be applied directly to the training set.'
-                  : '🔍 Review mode — tags will be staged for your sign-off before entering the dataset.'}
+                  ? 'Auto-approve mode — tags will be applied directly to the training set.'
+                  : 'Review mode — tags will be staged for your sign-off before entering the dataset.'}
                 <div style={{ fontSize:11, color:'#999', marginTop:3 }}>
                   Change mode using the toggle at the top of the page.
                 </div>
@@ -299,12 +299,12 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                 function type, decor style, complexity tier and estimate a cost range.
               </p>
 
-              {aiError && (
-                <div style={{ padding:'10px 14px', borderRadius:8, fontSize:13, marginBottom:14,
-                  background:'rgba(220,53,69,0.08)', color:'#dc2626', border:'1px solid rgba(220,53,69,0.2)' }}>
-                  ⚠️ {aiError}
-                </div>
-              )}
+                {aiError && (
+                  <div style={{ padding:'10px 14px', borderRadius:8, fontSize:13, marginBottom:14,
+                    background:'rgba(220,53,69,0.08)', color:'#dc2626', border:'1px solid rgba(220,53,69,0.2)' }}>
+                    {aiError}
+                  </div>
+                )}
 
               <button
                 disabled={aiLoading}
@@ -313,7 +313,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                   borderRadius:8, color:'#E8C97A', fontSize:13, fontWeight:700, cursor:'pointer',
                   opacity:aiLoading?0.6:1, fontFamily:"'Jost',sans-serif", letterSpacing:'0.5px' }}
               >
-                {aiLoading ? '🧠 Analysing…' : bypass ? '🤖 Tag with AI (Auto-approve)' : '🤖 Tag with AI (Review first)'}
+                {aiLoading ? 'Analysing…' : bypass ? 'Tag with AI (Auto-approve)' : 'Tag with AI (Review first)'}
               </button>
               <div style={{ fontSize:11, color:'#999', marginTop:10 }}>
                 Uses Claude Sonnet vision. ~₹0.05–0.15 per image via OpenRouter.
@@ -330,7 +330,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:12 }}>
                   {[
-                    { label:'Function',   value:`${FN_EMOJI[suggestion.suggested_function]??''} ${suggestion.suggested_function}` },
+                    { label:'Function',   value:suggestion.suggested_function },
                     { label:'Style',      value: suggestion.suggested_style },
                     { label:'Complexity', value:<span style={{color:COMPLEXITY_COLOR[suggestion.suggested_complexity]}}>{suggestion.suggested_complexity}</span> },
                   ].map(item => (
@@ -364,20 +364,20 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                     fontFamily:"'Jost',sans-serif" }}>
                   ✓ Accept
                 </button>
+                <button onClick={() => handleSuggestion('accept')} disabled={submitting}
+                  style={{ flex:1, padding:'10px', background:'#15803d', border:'none', borderRadius:7,
+                    color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', opacity:submitting?0.5:1,
+                    fontFamily:"'Jost',sans-serif" }}
+                >
+                  Accept
+                </button>
                 <button onClick={() => handleSuggestion('reject')} disabled={submitting}
                   style={{ padding:'10px 16px', background:'#dc2626', border:'none', borderRadius:7,
                     color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', opacity:submitting?0.5:1,
-                    fontFamily:"'Jost',sans-serif" }}>
-                  ✕ Reject
+                    fontFamily:"'Jost',sans-serif" }}
+                >
+                  Reject
                 </button>
-              </div>
-
-              <div style={{ borderTop:'1px solid #f0e8e0', paddingTop:14 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'#333', marginBottom:10 }}>
-                  Or edit before accepting:
-                </div>
-                <LabelForm
-                  initial={{
                     function_type: suggestion.suggested_function,
                     style:         suggestion.suggested_style,
                     complexity:    suggestion.suggested_complexity,
@@ -556,7 +556,7 @@ export default function AdminLabelling() {
       <div style={S.topbar}>
         <div>
           <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:'#1a0a0a', margin:0 }}>
-            🏷️ Labelling Queue
+            Labelling Queue
           </h1>
           <p style={{ color:'#888', fontSize:13, margin:'4px 0 0' }}>
             Tag scraped images to build the decor cost prediction dataset.
@@ -592,7 +592,7 @@ export default function AdminLabelling() {
               border:'1px solid #e0d5c5', borderRadius:7, color: batchMode ? '#E8C97A' : '#7a1c1c',
               fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:"'Jost',sans-serif" }}
           >
-            {batchMode ? '✕ Cancel Batch' : '⚡ Batch AI Tag'}
+            {batchMode ? 'Cancel Batch' : 'Batch AI Tag'}
           </button>
         </div>
       </div>
@@ -638,7 +638,7 @@ export default function AdminLabelling() {
                 cursor: batchSelected.size ? 'pointer' : 'default',
                 opacity: batchSelected.size ? 1 : 0.4, fontFamily:"'Jost',sans-serif" }}
             >
-              🤖 Tag {batchSelected.size || ''} Images
+              Tag {batchSelected.size || ''} Images
             </button>
           </div>
         </div>
@@ -664,7 +664,7 @@ export default function AdminLabelling() {
       ) : images.length === 0 ? (
         <div style={{ textAlign:'center', padding:'48px', color:'#999' }}>
           <div style={{ fontSize:36, marginBottom:12 }}>
-            {tab === 'queue' ? '🎉' : tab === 'pending' ? '✨' : '📂'}
+            {tab === 'queue' ? '' : tab === 'pending' ? '' : ''}
           </div>
           <div style={{ fontSize:15, fontWeight:600, color:'#333', marginBottom:6 }}>
             {tab === 'queue' ? 'Queue is empty' : tab === 'pending' ? 'No pending sign-offs' : 'No labelled images yet'}

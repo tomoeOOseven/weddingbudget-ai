@@ -31,7 +31,7 @@ export default function Step3Artists({ inputs, toggle, refData }) {
                 <div style={{ fontWeight:600, fontSize:14, color:'var(--text)' }}>{a.label}</div>
                 <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, color:'var(--maroon)', fontWeight:600, marginTop:4 }}>{fmt(a.costMin)} – {fmt(a.costMax)}</div>
               </div>
-              {on && <div style={{ fontSize:22, color:'var(--gold)' }}>✓</div>}
+              {on && <div style={{ fontSize:22, color:'var(--gold)' }}></div>}
             </div>
           );
         })}

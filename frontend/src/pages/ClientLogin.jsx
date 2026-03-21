@@ -88,8 +88,8 @@ export default function ClientLogin() {
           <button style={S.tab(mode==='signup')} onClick={() => { setMode('signup'); setError(''); setOk(''); }}>Create Account</button>
         </div>
 
-        {error && <div style={S.err}>⚠️ {error}</div>}
-        {ok    && <div style={S.ok}>✓ {ok}</div>}
+        {error && <div style={S.err}>{error}</div>}
+        {ok    && <div style={S.ok}>{ok}</div>}
 
         <form onSubmit={handleSubmit}>
           {mode === 'signup' && (

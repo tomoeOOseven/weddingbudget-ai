@@ -1,5 +1,6 @@
 // Step7Report.jsx — full report with export, scenarios, and actuals tracker
 import React, { useState, useEffect } from 'react';
+import { FiDownload, FiBarChart2, FiClipboard } from 'react-icons/fi';
 import { BtnPrimary, BtnOutline, CAT_COLORS, fmt } from './ui.jsx';
 import { downloadPDF, downloadXLSX, fetchActuals, addActual, updateActual, deleteActual, fetchScenarios, saveScenario } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -43,8 +44,8 @@ function ExportButton({ budget, inputs }) {
 
   return (
     <>
-      <BtnOutline onClick={handlePDF}  disabled={pdfLoading}>{pdfLoading  ? 'Generating…' : '📥 Export PDF'}</BtnOutline>
-      <BtnOutline onClick={handleXLSX} disabled={xlsxLoading}>{xlsxLoading ? 'Generating…' : '📊 Export Excel'}</BtnOutline>
+      <BtnOutline onClick={handlePDF}  disabled={pdfLoading}>{pdfLoading  ? 'Generating…' : <><FiDownload style={{verticalAlign:'middle',marginRight:4}}/>Export PDF</>}</BtnOutline>
+      <BtnOutline onClick={handleXLSX} disabled={xlsxLoading}>{xlsxLoading ? 'Generating…' : <><FiBarChart2 style={{verticalAlign:'middle',marginRight:4}}/>Export Excel</>}</BtnOutline>
     </>
   );
 }
@@ -76,7 +77,7 @@ function ScenarioComparison({ weddingId, currentTotal }) {
 
   return (
     <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px', marginBottom:16 }}>
-      <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)', marginBottom:14 }}>📊 Scenario Comparison</div>
+      <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)', marginBottom:14 }}><FiBarChart2 style={{verticalAlign:'middle',marginRight:6}}/>Scenario Comparison</div>
       {scenarios.length === 0 ? (
         <p style={{ fontSize:13, color:'var(--muted)', marginBottom:14 }}>Save the current estimate as a named scenario to compare options (e.g. "Palace vs City Hotel").</p>
       ) : (
@@ -151,7 +152,7 @@ function BudgetTracker({ weddingId, estimatedItems }) {
   return (
     <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px', marginBottom:16 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)' }}>📋 Actuals Tracker</div>
+        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)' }}><FiClipboard style={{verticalAlign:'middle',marginRight:6}}/>Actuals Tracker</div>
         <button onClick={() => setAdding(!adding)} style={{ padding:'7px 14px', background: adding ? 'transparent' : 'var(--maroon)', border:'1px solid var(--maroon)', borderRadius:7, color: adding ? 'var(--maroon)' : '#E8C97A', fontSize:12, fontWeight:700, cursor:'pointer' }}>
           {adding ? '✕ Cancel' : '+ Log Actual'}
         </button>

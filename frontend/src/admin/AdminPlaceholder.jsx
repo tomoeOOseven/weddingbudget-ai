@@ -1,13 +1,16 @@
 import React from 'react';
+import { FiGift } from 'react-icons/fi';
 
 export default function AdminPlaceholder({ title, icon, description }) {
+  // Use Feather icon if no icon provided
+  const CenterIcon = icon || <FiGift size={48} style={{ marginBottom: 12 }} />;
   return (
     <div>
       <h1 style={{
         fontFamily: "'Cormorant Garamond', serif", fontSize: 28,
         color: '#1a0a0a', margin: '0 0 8px',
       }}>
-        {icon} {title}
+        {title}
       </h1>
       <p style={{ color: '#888', fontSize: 13, marginBottom: 32 }}>
         {description ?? 'This module is being built.'}
@@ -16,7 +19,7 @@ export default function AdminPlaceholder({ title, icon, description }) {
         background: '#fff', border: '2px dashed rgba(0,0,0,0.1)',
         borderRadius: 12, padding: '48px 32px', textAlign: 'center',
       }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>{icon}</div>
+        <div>{CenterIcon}</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 8 }}>
           {title} — Coming next
         </div>

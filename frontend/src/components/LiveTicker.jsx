@@ -48,7 +48,7 @@ export function StepNav({ step, setStep }) {
               borderBottom: active ? '2px solid var(--gold)' : '2px solid transparent',
               cursor:'pointer', whiteSpace:'nowrap', transition:'all 0.2s',
             }}>
-              {done ? '✓ ' : ''}{label}
+              {label}
             </button>
           );
         })}

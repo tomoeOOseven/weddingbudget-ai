@@ -41,7 +41,7 @@ export function Chip({ on, onClick, children, style = {} }) {
       transition:'all 0.15s', ...style,
     }}>
       {children}
-      {on && <span style={{ marginLeft:'auto', color:'var(--gold)' }}>✓</span>}
+      {on && <span style={{ marginLeft:'auto', color:'var(--gold)' }}></span>}
     </div>
   );
 }

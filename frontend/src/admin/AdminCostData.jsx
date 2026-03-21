@@ -59,7 +59,7 @@ function CostTable({ title, icon, rows, columns, onUpdate, onAdd, onDelete, addF
     setMsg('');
     try {
       await onUpdate(id, { [field]: value });
-      setMsg('✓ Saved');
+      setMsg('Saved');
       setTimeout(() => setMsg(''), 2000);
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setSaving(s => ({ ...s, [id]: false })); }
@@ -81,7 +81,7 @@ function CostTable({ title, icon, rows, columns, onUpdate, onAdd, onDelete, addF
         <div style={S.title}>{icon} {title}</div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           {msg && <span style={{ fontSize:12, color: msg.startsWith('Error') ? '#dc2626' : '#15803d' }}>{msg}</span>}
-          {onAdd && <button style={S.addBtn} onClick={() => setShowAdd(!showAdd)}>{showAdd ? '✕ Cancel' : '+ Add'}</button>}
+          {onAdd && <button style={S.addBtn} onClick={() => setShowAdd(!showAdd)}>{showAdd ? 'Cancel' : '+ Add'}</button>}
         </div>
       </div>
 
@@ -110,7 +110,7 @@ function CostTable({ title, icon, rows, columns, onUpdate, onAdd, onDelete, addF
               ))}
               <td style={S.td}>
                 {onDelete && (
-                  <button onClick={() => onDelete(row.id)} style={{ background:'none', border:'none', color:'#dc2626', cursor:'pointer', fontSize:13 }}>✕</button>
+                  <button onClick={() => onDelete(row.id)} style={{ background:'none', border:'none', color:'#dc2626', cursor:'pointer', fontSize:13 }}>Delete</button>
                 )}
               </td>
             </tr>
@@ -140,7 +140,7 @@ function AuditLog() {
 
   return (
     <div>
-      <div style={{ fontSize:14, fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', color:'#333', marginBottom:12 }}>📋 Audit Log</div>
+      <div style={{ fontSize:14, fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', color:'#333', marginBottom:12 }}>Audit Log</div>
       {loading ? <div style={{ color:'#999', fontSize:13 }}>Loading…</div> : (
         <div style={{ background:'#fff', border:'1px solid rgba(0,0,0,0.07)', borderRadius:12, overflow:'hidden' }}>
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -238,7 +238,7 @@ export default function AdminCostData() {
 
   return (
     <div style={{ fontFamily:"'Jost',sans-serif" }}>
-      <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:'#1a0a0a', margin:'0 0 6px' }}>💰 Cost Data Management</h1>
+      <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:'#1a0a0a', margin:'0 0 6px' }}>Cost Data Management</h1>
       <p style={{ color:'#888', fontSize:13, marginBottom:20 }}>All edits are version-controlled and logged. Click any value to edit inline, press Enter to save.</p>
 
       <div style={{ display:'flex', gap:0, marginBottom:24, background:'#f5f0eb', borderRadius:8, padding:4, flexWrap:'wrap' }}>
@@ -251,7 +251,7 @@ export default function AdminCostData() {
         <>
           {activeTab === 'artists' && (
             <CostTable
-              title="Artists & Entertainment" icon="🎤"
+              title="Artists & Entertainment"
               rows={artists}
               columns={[
                 { key:'label',       label:'Artist / Tier', editable:true },
@@ -269,7 +269,7 @@ export default function AdminCostData() {
 
           {activeTab === 'cities' && (
             <CostTable
-              title="City Cost Multipliers" icon="🏙️"
+              title="City Cost Multipliers"
               rows={cities}
               columns={[
                 { key:'label',      label:'City' },
@@ -283,7 +283,7 @@ export default function AdminCostData() {
 
           {activeTab === 'meals' && (
             <CostTable
-              title="Meal Types (per head)" icon="🍽️"
+              title="Meal Types (per head)"
               rows={meals}
               columns={[
                 { key:'label',       label:'Meal Type' },
@@ -297,7 +297,7 @@ export default function AdminCostData() {
 
           {activeTab === 'bar' && (
             <CostTable
-              title="Bar Tiers (per head)" icon="🍸"
+              title="Bar Tiers (per head)"
               rows={barTiers}
               columns={[
                 { key:'label',       label:'Bar Tier' },
@@ -311,7 +311,7 @@ export default function AdminCostData() {
 
           {activeTab === 'counters' && (
             <CostTable
-              title="Specialty Counters" icon="🍜"
+              title="Specialty Counters"
               rows={counters}
               columns={[
                 { key:'label',    label:'Counter' },
@@ -325,7 +325,7 @@ export default function AdminCostData() {
 
           {activeTab === 'logistics' && logistics && (
             <CostTable
-              title="Logistics Rates" icon="🚗"
+              title="Logistics Rates"
               rows={[logistics]}
               columns={[
                 { key:'guests_per_vehicle', label:'Guests/Vehicle', editable:true, type:'number' },
@@ -343,7 +343,7 @@ export default function AdminCostData() {
 
           {activeTab === 'sfx' && (
             <CostTable
-              title="SFX Items" icon="🎆"
+              title="SFX Items"
               rows={sfx}
               columns={[
                 { key:'label',      label:'Item' },
@@ -357,7 +357,7 @@ export default function AdminCostData() {
 
           {activeTab === 'sundries' && sundries && (
             <CostTable
-              title="Sundries & Extras Config" icon="🎁"
+              title="Sundries & Extras Config"
               rows={[sundries]}
               columns={[
                 { key:'room_basket_min',          label:'Basket Min', editable:true, type:'number' },
