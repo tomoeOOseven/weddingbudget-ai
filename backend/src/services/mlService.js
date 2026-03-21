@@ -12,9 +12,38 @@ const ML_URL = process.env.ML_SERVICE_URL
     ? DEFAULT_PROD_ML_URL
     : 'http://localhost:8000');
 const TIMEOUT = 30000;
+const TRANSIENT_STATUS_CODES = new Set([429, 502, 503, 504]);
 
 function trimTrailingSlash(url) {
   return String(url || '').replace(/\/+$/, '');
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function probeHealth(baseUrl, attempts = 3) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const { data } = await axios.get(`${baseUrl}/health`, { timeout: 15000 });
+      return { ok: true, data };
+    } catch (err) {
+      lastError = err;
+      const code = err?.response?.status;
+      const isTransient = TRANSIENT_STATUS_CODES.has(code);
+      if (!isTransient || attempt === attempts) break;
+      await sleep(600 * attempt);
+    }
+  }
+
+  return {
+    ok: false,
+    error: lastError,
+    statusCode: lastError?.response?.status ?? null,
+    transient: TRANSIENT_STATUS_CODES.has(lastError?.response?.status),
+  };
 }
 
 /**
@@ -115,21 +144,23 @@ async function checkHealth() {
     ...(primary === fallback ? [] : [fallback]),
   ];
 
-  let lastError = null;
+  let lastProbe = null;
 
   for (const base of candidates) {
-    try {
-      const { data } = await axios.get(`${base}/health`, { timeout: 12000 });
-      return { available: true, checked_url: base, ...data };
-    } catch (err) {
-      lastError = err;
+    const probe = await probeHealth(base, 3);
+    if (probe.ok) {
+      return { available: true, checked_url: base, ...probe.data };
     }
+    lastProbe = { ...probe, base };
   }
 
+  const statusCode = lastProbe?.statusCode ?? null;
   return {
     available: false,
     checked_url: primary,
-    error: lastError?.message || 'Health check failed',
+    status_code: statusCode,
+    warming_up: lastProbe?.transient ?? false,
+    error: lastProbe?.error?.message || 'Health check failed',
   };
 }
 
