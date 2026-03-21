@@ -6,11 +6,16 @@
 
 const axios = require('axios');
 
+const DEFAULT_PROD_ML_URL = 'https://weddingbudget-ml-service.onrender.com';
 const ML_URL = process.env.ML_SERVICE_URL
   ?? (process.env.NODE_ENV === 'production'
-    ? 'https://weddingbudget-ml-service.onrender.com'
+    ? DEFAULT_PROD_ML_URL
     : 'http://localhost:8000');
 const TIMEOUT = 30000;
+
+function trimTrailingSlash(url) {
+  return String(url || '').replace(/\/+$/, '');
+}
 
 /**
  * Predict cost range for a decor item.
@@ -103,12 +108,29 @@ async function getModelStatus() {
  * Health check — is the ML service running?
  */
 async function checkHealth() {
-  try {
-    const { data } = await axios.get(`${ML_URL}/health`, { timeout: 12000 });
-    return { available: true, ...data };
-  } catch {
-    return { available: false };
+  const primary = trimTrailingSlash(ML_URL);
+  const fallback = trimTrailingSlash(DEFAULT_PROD_ML_URL);
+  const candidates = [
+    primary,
+    ...(primary === fallback ? [] : [fallback]),
+  ];
+
+  let lastError = null;
+
+  for (const base of candidates) {
+    try {
+      const { data } = await axios.get(`${base}/health`, { timeout: 12000 });
+      return { available: true, checked_url: base, ...data };
+    } catch (err) {
+      lastError = err;
+    }
   }
+
+  return {
+    available: false,
+    checked_url: primary,
+    error: lastError?.message || 'Health check failed',
+  };
 }
 
 module.exports = { predictCost, embedImage, triggerTraining, getModelStatus, checkHealth };
