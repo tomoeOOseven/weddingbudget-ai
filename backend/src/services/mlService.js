@@ -6,7 +6,10 @@
 
 const axios = require('axios');
 
-const ML_URL  = process.env.ML_SERVICE_URL ?? 'http://localhost:8000';
+const ML_URL = process.env.ML_SERVICE_URL
+  ?? (process.env.NODE_ENV === 'production'
+    ? 'https://weddingbudget-ml-service.onrender.com'
+    : 'http://localhost:8000');
 const TIMEOUT = 30000;
 
 /**
@@ -101,7 +104,7 @@ async function getModelStatus() {
  */
 async function checkHealth() {
   try {
-    const { data } = await axios.get(`${ML_URL}/health`, { timeout: 3000 });
+    const { data } = await axios.get(`${ML_URL}/health`, { timeout: 12000 });
     return { available: true, ...data };
   } catch {
     return { available: false };
