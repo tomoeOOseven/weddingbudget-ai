@@ -44,6 +44,7 @@ function StatusBadge({ status }) {
 export default function AdminModel() {
   const [versions, setVersions]     = useState([]);
   const [mlHealth, setMlHealth]     = useState(null);
+  const [statusError, setStatusError] = useState('');
   const [trainingStats, setTrainingStats] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [versionLabel, setVersionLabel] = useState('');
@@ -60,7 +61,12 @@ export default function AdminModel() {
       setVersions(statusData.versions ?? []);
       setMlHealth(statusData.mlHealth);
       setTrainingStats(statsData);
-    } catch (e) { console.error(e); }
+      setStatusError('');
+    } catch (e) {
+      console.error(e);
+      setStatusError(e?.message || 'Could not load model status.');
+      setMlHealth(null);
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -126,14 +132,31 @@ export default function AdminModel() {
       {/* ML Service health */}
       <div style={{ ...S.card, marginBottom:20, display:'flex', alignItems:'center', gap:12 }}>
         <div style={{ width:10, height:10, borderRadius:'50%',
-          background: mlHealth?.available ? '#16a34a' : '#dc2626' }} />
+          background: statusError ? '#d97706' : (mlHealth?.available ? '#16a34a' : '#dc2626') }} />
         <div style={{ fontSize:13 }}>
-          ML Service: <strong>{mlHealth?.available ? 'Online' : 'Offline'}</strong>
+          ML Service: <strong>
+            {statusError ? 'Status Unavailable' : (mlHealth?.available ? 'Online' : 'Offline')}
+          </strong>
           {mlHealth?.available && (
             <span style={{ color:'#888', marginLeft:12 }}>
               CLIP {mlHealth.clip_available ? '✓ loaded' : '✗ not available'} ·
               Model in memory: {mlHealth.model_loaded ? '✓' : '✗'}
             </span>
+          )}
+          {!mlHealth?.available && mlHealth?.checked_url && !statusError && (
+            <div style={{ color:'#999', marginTop:4, fontSize:11 }}>
+              Checked: {mlHealth.checked_url}
+            </div>
+          )}
+          {!mlHealth?.available && mlHealth?.error && !statusError && (
+            <div style={{ color:'#b45309', marginTop:2, fontSize:11 }}>
+              Error: {mlHealth.error}
+            </div>
+          )}
+          {statusError && (
+            <div style={{ color:'#b45309', marginTop:4, fontSize:11 }}>
+              Could not fetch model status: {statusError}
+            </div>
           )}
         </div>
       </div>
