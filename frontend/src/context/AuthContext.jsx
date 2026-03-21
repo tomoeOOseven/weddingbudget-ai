@@ -78,16 +78,23 @@ export function AuthProvider({ children }) {
         setToken(session?.access_token ?? null);
         const u = session?.user ?? null;
         setUser(u);
-        await fetchProfile(u);
 
-        // INITIAL_SESSION is always the first event fired — safe to clear loading here
-        if (event === 'INITIAL_SESSION') {
-          setLoading(false);
-        }
+        // Never block the app shell on profile IO; load it in the background.
+        fetchProfile(u);
+
+        // INITIAL_SESSION is always the first event fired.
+        // Clear loading immediately so transient profile/network stalls don't freeze the app.
+        if (event === 'INITIAL_SESSION') setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    // Safety net: if auth events are delayed/broken, do not keep the UI stuck forever.
+    const loadingTimeout = setTimeout(() => setLoading(false), 8000);
+
+    return () => {
+      clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function signIn(email, password) {
