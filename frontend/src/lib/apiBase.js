@@ -7,7 +7,6 @@ const fallbackBases = isLocalHost
   ? ['http://localhost:4000']
   : [
       'https://weddingbudget-backend-k29m.onrender.com',
-      'https://weddingbudget-backend.onrender.com',
     ];
 
 export const API_BASES = [...new Set([configuredBase, ...fallbackBases].filter(Boolean))];

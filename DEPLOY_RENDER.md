@@ -15,7 +15,7 @@ Render uses the root `render.yaml` blueprint.
 3. Build command: `npm run build`
 4. Output directory: `dist`
 5. Set frontend env vars in Vercel:
-   - `VITE_API_URL` = your Render backend URL (for example `https://weddingbudget-backend.onrender.com`)
+   - `VITE_API_URL` = your Render backend URL (for example `https://weddingbudget-backend-k29m.onrender.com`)
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
 6. Deploy and copy the Vercel app URL.
