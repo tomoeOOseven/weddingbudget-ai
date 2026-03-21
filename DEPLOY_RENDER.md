@@ -42,7 +42,7 @@ Render uses the root `render.yaml` blueprint.
    - `OPENROUTER_FOURTH_FALLBACK_MODEL` (optional)
    - `OPENROUTER_FIFTH_FALLBACK_MODEL` (optional)
    - `FRONTEND_URL` (your deployed Vercel frontend URL)
-   - `ML_SERVICE_URL` = URL of `weddingbudget-ml-service`
+   - `ML_SERVICE_URL` = `https://weddingbudget-ml-service.onrender.com`
 8. Redeploy backend after setting `ML_SERVICE_URL`.
 9. Verify backend CORS works by opening the Vercel app and testing one API call.
 

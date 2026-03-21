@@ -35,7 +35,7 @@ services:
       - key: API_SECRET_KEY
         sync: false
       - key: ML_SERVICE_URL
-        sync: false
+        value: https://weddingbudget-ml-service.onrender.com
 
   - type: web
     name: weddingbudget-ml-service
