@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: weddingbudget-backend
+    runtime: node
+    rootDir: backend
+    plan: starter
+    buildCommand: npm ci && npx playwright install chromium
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
+      - key: FRONTEND_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        sync: false
+      - key: OPENROUTER_FALLBACK_MODEL
+        sync: false
+      - key: OPENROUTER_SECONDARY_FALLBACK_MODEL
+        sync: false
+      - key: OPENROUTER_FOURTH_FALLBACK_MODEL
+        sync: false
+      - key: OPENROUTER_FIFTH_FALLBACK_MODEL
+        sync: false
+      - key: API_SECRET_KEY
+        sync: false
+      - key: ML_SERVICE_URL
+        sync: false
+
+  - type: web
+    name: weddingbudget-ml-service
+    runtime: python
+    rootDir: ml_service
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
