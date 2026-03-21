@@ -121,7 +121,7 @@ router.post('/label', requireAdmin, async (req, res) => {
 // Body: { bypass?: boolean }
 //   bypass: false (default) — stage as pending suggestion for admin sign-off
 //   bypass: true            — write directly to image_labels, skip review
-router.post('/autotag/:imageId', requireAdmin, async (req, res) => {
+router.post('/autotag/:imageId([0-9a-fA-F-]{36})', requireAdmin, async (req, res) => {
   const { imageId } = req.params;
   const bypass = req.body.bypass === true;
 
