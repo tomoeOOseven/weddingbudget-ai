@@ -413,8 +413,10 @@ export default function AdminLabelling() {
   const [batchMode, setBatchMode]     = useState(false);
   const [batchSelected, setBatchSelected] = useState(new Set());
   const [batchMsg, setBatchMsg] = useState('');
+  const [batchSelectingAll, setBatchSelectingAll] = useState(false);
 
   const LIMIT = 24;
+  const BATCH_LIMIT = 50;
 
   const loadStats = useCallback(async () => {
     try { setStats(await apiFetch('/api/labelling/stats')); } catch {}
@@ -445,11 +447,22 @@ export default function AdminLabelling() {
     if (!batchSelected.size) return;
     setBatchMsg('');
     try {
-      const data = await apiFetch('/api/labelling/autotag/batch', {
-        method: 'POST',
-        body: JSON.stringify({ imageIds: [...batchSelected], bypass }),
-      });
-      setBatchMsg(`✓ ${data.message}`);
+      const imageIds = [...batchSelected];
+      const chunks = [];
+      for (let i = 0; i < imageIds.length; i += BATCH_LIMIT) {
+        chunks.push(imageIds.slice(i, i + BATCH_LIMIT));
+      }
+
+      let processed = 0;
+      for (const chunk of chunks) {
+        await apiFetch('/api/labelling/autotag/batch', {
+          method: 'POST',
+          body: JSON.stringify({ imageIds: chunk, bypass }),
+        });
+        processed += chunk.length;
+      }
+
+      setBatchMsg(`✓ Batch auto-tag started for ${processed} images in ${chunks.length} request${chunks.length > 1 ? 's' : ''}.`);
       setBatchSelected(new Set());
       setBatchMode(false);
       if (bypass) loadImages();
@@ -457,13 +470,44 @@ export default function AdminLabelling() {
     } catch (e) { setBatchMsg(`Error: ${e.message}`); }
   }
 
-  const allVisibleSelected = images.length > 0 && images.every(img => batchSelected.has(img.id));
+  const allAvailableSelected = total > 0 && batchSelected.size === total;
 
-  function handleSelectAllVisible() {
-    setBatchSelected(sel => {
-      if (allVisibleSelected) return new Set();
-      return new Set(images.map(img => img.id));
-    });
+  async function handleSelectAllAvailable() {
+    if (allAvailableSelected) {
+      setBatchSelected(new Set());
+      return;
+    }
+
+    setBatchSelectingAll(true);
+    setBatchMsg('');
+    try {
+      const status = tab === 'dataset' ? 'labelled' : 'raw';
+      const pageLimit = 100;
+      let pageOffset = 0;
+      const ids = [];
+      let done = false;
+
+      while (!done) {
+        const params = new URLSearchParams({
+          limit: String(pageLimit),
+          offset: String(pageOffset),
+          status,
+        });
+        const data = await apiFetch(`/api/labelling/queue?${params}`);
+        const page = data.images ?? [];
+
+        ids.push(...page.map(img => img.id));
+        done = page.length < pageLimit;
+        pageOffset += pageLimit;
+      }
+
+      setBatchSelected(new Set(ids));
+      setBatchMsg(`✓ Selected all available images (${ids.length}).`);
+    } catch (e) {
+      setBatchMsg(`Error: ${e.message}`);
+    } finally {
+      setBatchSelectingAll(false);
+    }
   }
 
   const S = {
@@ -550,14 +594,14 @@ export default function AdminLabelling() {
           </div>
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
             <button
-              disabled={images.length === 0}
-              onClick={handleSelectAllVisible}
+              disabled={total === 0 || batchSelectingAll}
+              onClick={handleSelectAllAvailable}
               style={{ padding:'8px 12px', background:'transparent', border:'1px solid #E8C97A', borderRadius:7,
                 color:'#E8C97A', fontSize:12, fontWeight:700,
-                cursor: images.length ? 'pointer' : 'default',
-                opacity: images.length ? 1 : 0.4, fontFamily:"'Jost',sans-serif" }}
+                cursor: (total > 0 && !batchSelectingAll) ? 'pointer' : 'default',
+                opacity: (total > 0 && !batchSelectingAll) ? 1 : 0.4, fontFamily:"'Jost',sans-serif" }}
             >
-              {allVisibleSelected ? 'Clear All' : `Select All (${images.length})`}
+              {batchSelectingAll ? 'Selecting…' : allAvailableSelected ? 'Clear All' : `Select All (${total})`}
             </button>
             {batchMsg && (
               <span style={{ fontSize:12, color: batchMsg.startsWith('Error') ? '#ff8080' : '#86efac' }}>
