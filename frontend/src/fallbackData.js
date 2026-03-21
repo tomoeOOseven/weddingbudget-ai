@@ -1,0 +1,98 @@
+// fallbackData.js — used when backend is unreachable.
+// Shape MUST match GET /api/data/all exactly.
+// cities and hotelTiers are slug-keyed objects, not arrays.
+
+export default {
+  cities: {
+    udaipur:   { mult:1.2, label:'Udaipur',   region:'Rajasthan' },
+    jaipur:    { mult:1.1, label:'Jaipur',    region:'Rajasthan' },
+    mumbai:    { mult:1.4, label:'Mumbai',    region:'Maharashtra' },
+    delhi:     { mult:1.3, label:'Delhi',     region:'NCR' },
+    goa:       { mult:1.3, label:'Goa',       region:'Goa' },
+    bangalore: { mult:1.2, label:'Bangalore', region:'Karnataka' },
+    hyderabad: { mult:1.0, label:'Hyderabad', region:'Telangana' },
+    kolkata:   { mult:0.9, label:'Kolkata',   region:'West Bengal' },
+    chennai:   { mult:1.0, label:'Chennai',   region:'Tamil Nadu' },
+    pune:      { mult:1.1, label:'Pune',      region:'Maharashtra' },
+  },
+  hotelTiers: {
+    palace: { label:'5-Star Palace',     roomRate:25000, costMult:1.5,  decorMult:1.4 },
+    city5:  { label:'5-Star City Hotel', roomRate:15000, costMult:1.2,  decorMult:1.2 },
+    star4:  { label:'4-Star Hotel',      roomRate:8000,  costMult:1.0,  decorMult:1.0 },
+    resort: { label:'Resort',            roomRate:12000, costMult:1.1,  decorMult:1.1 },
+    farm:   { label:'Farmhouse / Villa', roomRate:6000,  costMult:0.85, decorMult:0.9 },
+  },
+  functions: [
+    { id:'haldi',     label:'Haldi',     emoji:'💛' },
+    { id:'mehendi',   label:'Mehendi',   emoji:'🌿' },
+    { id:'sangeet',   label:'Sangeet',   emoji:'🎵' },
+    { id:'baraat',    label:'Baraat',    emoji:'🐴' },
+    { id:'pheras',    label:'Pheras',    emoji:'🔥' },
+    { id:'reception', label:'Reception', emoji:'✨' },
+  ],
+  decor: [
+    { id:'d1',  label:'Grand Floral Mandap',     function:'pheras',    style:'Traditional',  costMin:500000,  costMax:900000  },
+    { id:'d2',  label:'Marigold Wonderland',      function:'baraat',    style:'Traditional',  costMin:350000,  costMax:700000  },
+    { id:'d3',  label:'Crystal & Drapes Gala',    function:'reception', style:'Opulent',      costMin:800000,  costMax:1600000 },
+    { id:'d4',  label:'Boho Pampas Mehendi',      function:'mehendi',   style:'Boho',         costMin:120000,  costMax:250000  },
+    { id:'d5',  label:'Neon Disco Sangeet',       function:'sangeet',   style:'Modern',       costMin:400000,  costMax:800000  },
+    { id:'d6',  label:'Pastel Haldi Garden',      function:'haldi',     style:'Romantic',     costMin:80000,   costMax:180000  },
+    { id:'d7',  label:'Palace Grand Reception',   function:'reception', style:'Opulent',      costMin:1500000, costMax:3000000 },
+    { id:'d8',  label:'Tropical Jungle Sangeet',  function:'sangeet',   style:'Contemporary', costMin:300000,  costMax:550000  },
+    { id:'d9',  label:'Minimalist White Pheras',  function:'pheras',    style:'Contemporary', costMin:200000,  costMax:400000  },
+    { id:'d10', label:'Mirror & Gold Gala',       function:'reception', style:'Opulent',      costMin:1000000, costMax:2200000 },
+  ],
+  artists: [
+    { id:'a1', type:'DJ',     label:'Club DJ (Local)',            costMin:50000,   costMax:150000  },
+    { id:'a2', type:'DJ',     label:'DJ (National Name)',         costMin:350000,  costMax:900000  },
+    { id:'a3', type:'Band',   label:'Live Band (6-piece)',        costMin:200000,  costMax:450000  },
+    { id:'a4', type:'Singer', label:'Bollywood Singer – Tier B', costMin:600000,  costMax:1000000 },
+    { id:'a5', type:'Singer', label:'Bollywood Singer – Tier A', costMin:1500000, costMax:3000000 },
+    { id:'a6', type:'Folk',   label:'Folk Artists Group',        costMin:80000,   costMax:200000  },
+    { id:'a7', type:'Anchor', label:'Celebrity Anchor',          costMin:150000,  costMax:350000  },
+    { id:'a8', type:'Choreo', label:'Choreographer + Team',      costMin:80000,   costMax:220000  },
+  ],
+  meals: [
+    { id:'welcome',  label:'Welcome Dinner',              costMinPH:2200, costMaxPH:4000 },
+    { id:'lunch',    label:'Lunch Buffet',                costMinPH:1400, costMaxPH:2500 },
+    { id:'gala',     label:'Gala Dinner',                 costMinPH:2800, costMaxPH:5000 },
+    { id:'floating', label:'Floating Snacks / Cocktails', costMinPH:700,  costMaxPH:1500 },
+  ],
+  barTiers: [
+    { id:'dry',  label:'Dry Event',   costMinPH:0,    costMaxPH:0    },
+    { id:'wine', label:'Beer & Wine', costMinPH:1000, costMaxPH:2000 },
+    { id:'full', label:'Full Bar',    costMinPH:2200, costMaxPH:4500 },
+  ],
+  specialtyCounters: [
+    { id:'chaat',    label:'Chaat Counter',     costMin:25000, costMax:45000 },
+    { id:'mocktail', label:'Mocktail Bar',      costMin:28000, costMax:50000 },
+    { id:'icecream', label:'Ice Cream Station', costMin:22000, costMax:40000 },
+    { id:'tea',      label:'Tea/Coffee 24hr',   costMin:18000, costMax:35000 },
+    { id:'pasta',    label:'Live Pasta',        costMin:32000, costMax:55000 },
+    { id:'sushi',    label:'Sushi Counter',     costMin:40000, costMax:70000 },
+  ],
+  // Matches new API field names: logistics (not logisticsRates), sfxItems (not sfx)
+  logistics: {
+    vehiclePerHead:3,
+    vehicleRateMin:4500,
+    vehicleRateMax:7000,
+    ghodiMin:45000,
+    ghodiMax:90000,
+    dholiUnitMin:15000,
+    dholiUnitMax:30000,
+  },
+  sfxItems: [
+    { id:'pyro',      label:'Cold Pyro (per stage)',     cost:18000  },
+    { id:'confetti',  label:'Confetti Cannons (set)',    cost:28000  },
+    { id:'fog',       label:'Fog Machine',               cost:12000  },
+    { id:'fireworks', label:'Fireworks Display (5 min)', cost:250000 },
+  ],
+  sundries: {
+    roomBasketMin:1800, roomBasketMax:3500,
+    ritualPerFnMin:35000, ritualPerFnMax:75000,
+    giftPerGuestMin:500, giftPerGuestMax:1500,
+    stationeryPerGuestMin:200, stationeryPerGuestMax:500,
+    photographyMin:180000, photographyMax:550000,
+    contingencyPct:0.05,
+  },
+};

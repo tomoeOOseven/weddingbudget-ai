@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: weddingbudget-ai-backend
+    runtime: node
+    region: singapore
+    plan: standard
+    buildCommand: npm install
+    startCommand: npm start
+    
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      
+      - key: PORT
+        value: 4000
+      
+      # Supabase Configuration
+      # Get these from: Supabase Dashboard → Settings → API
+      - key: SUPABASE_URL
+        sync: false
+        # You'll set this in the Render dashboard
+      
+      - key: SUPABASE_ANON_KEY
+        sync: false
+        # You'll set this in the Render dashboard
+      
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+        # You'll set this in the Render dashboard (keep it secret!)
+      
+      # Frontend URL for CORS
+      - key: FRONTEND_URL
+        value: https://your-project.vercel.app
+        sync: false
+      
+      # OpenRouter Configuration (for AI features)
+      - key: OPENROUTER_API_KEY
+        sync: false
+        # You'll set this in the Render dashboard
+      
+      - key: OPENROUTER_MODEL
+        value: google/gemma-3-27b-it:free
+      
+      - key: OPENROUTER_FALLBACK_MODEL
+        value: google/gemma-3-12b-it:free
+      
+      - key: OPENROUTER_SECONDARY_FALLBACK_MODEL
+        value: nvidia/nemotron-nano-12b-v2-vl:free
+      
+      - key: OPENROUTER_FOURTH_FALLBACK_MODEL
+        value: mistralai/mistral-small-3.1-24b-instruct:free
+      
+      - key: OPENROUTER_FIFTH_FALLBACK_MODEL
+        value: google/gemma-3-4b-it:free
+      
+      # ML Service Configuration (optional - if running separately)
+      - key: ML_SERVICE_URL
+        value: http://localhost:8000
+        sync: false
+    
+    # Health check
+    healthCheckPath: /health
+    maxScrollbackLines: 100
