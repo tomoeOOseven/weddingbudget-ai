@@ -55,5 +55,5 @@ Render uses the root `render.yaml` blueprint.
 
 - Backend scraper uses Playwright. The Render backend build installs Chromium (`npx playwright install chromium`) and sets `PLAYWRIGHT_BROWSERS_PATH=0`.
 - `ml_service` runs CPU-only on Render starter/free plans.
-- The ML service loads optional CLIP only if Torch/CLIP is available.
+- The ML service build installs CPU Torch + CLIP so visual embeddings are available in production.
 - If you use free plans, cold starts can delay first request.

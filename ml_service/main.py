@@ -27,7 +27,10 @@ from fastapi    import FastAPI, HTTPException, BackgroundTasks
 from pydantic   import BaseModel
 from supabase   import create_client, Client
 from sklearn.ensemble         import GradientBoostingRegressor
+from sklearn.ensemble         import RandomForestRegressor
+from sklearn.linear_model     import Ridge, ElasticNet
 from sklearn.model_selection  import train_test_split
+from sklearn.model_selection  import RepeatedKFold, cross_val_score
 from sklearn.metrics          import mean_absolute_error, r2_score
 from sklearn.preprocessing    import LabelEncoder
 
@@ -94,6 +97,8 @@ class EmbedRequest(BaseModel):
 class TrainRequest(BaseModel):
     version_label: str           # e.g. "v1.2"
     triggered_by:  Optional[str] = None   # admin profile UUID
+    force_best_model: Optional[bool] = None  # promote best learned model even if baseline wins
+    force_algorithm: Optional[str] = None  # force one algorithm: ridge|elasticnet|gbm_shallow|rf_shallow|gbm|rf
 
 class PredictRequest(BaseModel):
     image_id:      Optional[str] = None
@@ -236,11 +241,18 @@ def embed(req: EmbedRequest):
 async def train(req: TrainRequest, bg: BackgroundTasks):
     """Kick off model training in the background. Returns immediately."""
 
+    force_best_model_default = os.environ.get('ML_FORCE_BEST_MODEL_DEFAULT', 'false').lower() in ('1', 'true', 'yes', 'on')
+    force_best_model = req.force_best_model if req.force_best_model is not None else force_best_model_default
+    force_algorithm = req.force_algorithm.lower().strip() if req.force_algorithm else None
+    allowed_algorithms = {'ridge', 'elasticnet', 'gbm_shallow', 'rf_shallow', 'gbm', 'rf'}
+    if force_algorithm and force_algorithm not in allowed_algorithms:
+        raise HTTPException(400, f'Invalid force_algorithm: {force_algorithm}. Allowed: {sorted(allowed_algorithms)}')
+
     # Create model_versions row with status='training'
     mv_resp = supabase.table('model_versions').insert({
         'version_label': req.version_label,
         'status':        'training',
-        'algorithm':     'GBM',
+        'algorithm':     'AUTO_SELECT',
     }).execute()
 
     if not mv_resp.data:
@@ -253,12 +265,17 @@ async def train(req: TrainRequest, bg: BackgroundTasks):
         'model_version_id': version_id,
         'triggered_by':     req.triggered_by,
         'status':           'running',
-        'config':           { 'algorithm': 'GBM', 'n_estimators': 300, 'max_depth': 5 },
+        'config':           {
+            'algorithm': 'AUTO_SELECT',
+            'selection_mode': 'data_size_adaptive',
+            'force_best_model': force_best_model,
+            'force_algorithm': force_algorithm,
+        },
         'log':              [],
     }).execute()
     run_id = run_resp.data[0]['id']
 
-    bg.add_task(_run_training, version_id, run_id, req.version_label)
+    bg.add_task(_run_training, version_id, run_id, req.version_label, force_best_model, force_algorithm)
 
     return { 'version_id': version_id, 'run_id': run_id, 'message': 'Training started in background.' }
 
@@ -271,7 +288,7 @@ def _append_log(run_id: str, line: str):
     log.info(f'[train:{run_id[:8]}] {line}')
 
 
-def _run_training(version_id: str, run_id: str, version_label: str):
+def _run_training(version_id: str, run_id: str, version_label: str, force_best_model: bool = False, force_algorithm: Optional[str] = None):
     """Full training pipeline — runs in background thread."""
     import time
     start = time.time()
@@ -296,7 +313,35 @@ def _run_training(version_id: str, run_id: str, version_label: str):
             .select('image_id, embedding').in_('image_id', image_ids).execute()
         emb_map = { e['image_id']: np.array(e['embedding'], dtype=np.float32) for e in emb_resp.data }
 
+        # If CLIP is available, backfill missing embeddings so training can use visual features.
+        missing_ids = [img_id for img_id in image_ids if img_id not in emb_map]
+        if missing_ids and CLIP_AVAILABLE:
+            _append_log(run_id, f'Generating missing CLIP embeddings for {len(missing_ids)} images...')
+
+            src_resp = supabase.table('scraped_images') \
+                .select('id, image_url, storage_path').in_('id', missing_ids).execute()
+            src_rows = src_resp.data or []
+
+            generated = 0
+            for row in src_rows:
+                try:
+                    emb = extract_clip_embedding(row.get('image_url'), row.get('storage_path'))
+                    emb_map[row['id']] = emb
+                    supabase.table('image_embeddings').upsert({
+                        'image_id': row['id'],
+                        'embedding': emb.tolist(),
+                        'model_name': 'clip-vit-b32',
+                    }, on_conflict='image_id').execute()
+                    generated += 1
+                except Exception as emb_err:
+                    _append_log(run_id, f'Embedding failed for {row.get("id")}: {emb_err}')
+
+            _append_log(run_id, f'Generated and stored {generated} CLIP embeddings during training.')
+        elif missing_ids and not CLIP_AVAILABLE:
+            _append_log(run_id, 'CLIP not available on server; training will use non-visual features for missing images.')
+
         _append_log(run_id, f'Embeddings available for {len(emb_map)}/{len(labels)} images.')
+        use_clip_features = len(emb_map) > 0
 
         # Build feature matrix
         X, y_min, y_max = [], [], []
@@ -313,20 +358,95 @@ def _run_training(version_id: str, run_id: str, version_label: str):
 
         _append_log(run_id, f'Feature matrix: {X.shape}. Splitting 80/20 train/test…')
 
+        # Rule-based baseline (dataset-wide) for promotion gate.
+        rb_preds_min = []
+        rb_preds_max = []
+        for row in labels:
+            rb_min, rb_max, _, _ = _rule_based_estimate(row)
+            rb_preds_min.append(rb_min)
+            rb_preds_max.append(rb_max)
+
+        rb_mae_min = float(mean_absolute_error(y_min, np.array(rb_preds_min, dtype=np.float32)))
+        rb_mae_max = float(mean_absolute_error(y_max, np.array(rb_preds_max, dtype=np.float32)))
+        rb_mae_avg = (rb_mae_min + rb_mae_max) / 2.0
+        _append_log(run_id, f'Rule-based baseline MAE — min: {rb_mae_min:,.0f}, max: {rb_mae_max:,.0f}, avg: {rb_mae_avg:,.0f}')
+
+        sample_n = len(labels)
+        all_candidates = {
+            'ridge': lambda: Ridge(alpha=1.0, random_state=42),
+            'elasticnet': lambda: ElasticNet(alpha=0.05, l1_ratio=0.2, random_state=42, max_iter=10000),
+            'gbm_shallow': lambda: GradientBoostingRegressor(n_estimators=180, max_depth=3, learning_rate=0.05, subsample=0.85, min_samples_leaf=3, random_state=42),
+            'rf_shallow': lambda: RandomForestRegressor(n_estimators=250, max_depth=6, min_samples_leaf=2, random_state=42, n_jobs=-1),
+            'gbm': lambda: GradientBoostingRegressor(n_estimators=300, max_depth=5, learning_rate=0.05, subsample=0.8, min_samples_leaf=3, random_state=42),
+            'rf': lambda: RandomForestRegressor(n_estimators=400, max_depth=10, min_samples_leaf=2, random_state=42, n_jobs=-1),
+        }
+
+        if force_algorithm:
+            candidates = [(force_algorithm, all_candidates[force_algorithm])]
+            _append_log(run_id, f'Force-algorithm mode enabled: {force_algorithm}')
+        elif sample_n < 30:
+            candidates = [
+                ('ridge', all_candidates['ridge']),
+                ('elasticnet', all_candidates['elasticnet']),
+            ]
+        elif sample_n < 120:
+            candidates = [
+                ('ridge', all_candidates['ridge']),
+                ('elasticnet', all_candidates['elasticnet']),
+                ('gbm_shallow', all_candidates['gbm_shallow']),
+                ('rf_shallow', all_candidates['rf_shallow']),
+            ]
+        else:
+            candidates = [
+                ('ridge', all_candidates['ridge']),
+                ('elasticnet', all_candidates['elasticnet']),
+                ('gbm', all_candidates['gbm']),
+                ('rf', all_candidates['rf']),
+            ]
+
+        cv_splits = min(5, max(2, sample_n // 3))
+        rkf = RepeatedKFold(n_splits=cv_splits, n_repeats=3, random_state=42)
+
+        best_name = None
+        best_factory = None
+        best_cv_mae_min = float('inf')
+        best_cv_mae_max = float('inf')
+        best_cv_mae_avg = float('inf')
+
+        _append_log(run_id, f'Running adaptive model selection over {len(candidates)} candidates (n={sample_n}, cv={cv_splits}x3)…')
+        for name, make_model in candidates:
+            try:
+                cv_min = -cross_val_score(make_model(), X, y_min, scoring='neg_mean_absolute_error', cv=rkf, n_jobs=1).mean()
+                cv_max = -cross_val_score(make_model(), X, y_max, scoring='neg_mean_absolute_error', cv=rkf, n_jobs=1).mean()
+            except Exception as cv_err:
+                _append_log(run_id, f'Candidate {name} failed during CV: {cv_err}')
+                continue
+            cv_avg = (float(cv_min) + float(cv_max)) / 2.0
+            _append_log(run_id, f'Candidate {name} CV MAE — min: {cv_min:,.0f}, max: {cv_max:,.0f}, avg: {cv_avg:,.0f}')
+
+            if cv_avg < best_cv_mae_avg:
+                best_name = name
+                best_factory = make_model
+                best_cv_mae_min = float(cv_min)
+                best_cv_mae_max = float(cv_max)
+                best_cv_mae_avg = float(cv_avg)
+
+        if best_factory is None:
+            raise ValueError('All candidate algorithms failed during cross-validation.')
+
+        _append_log(run_id, f'Best candidate by CV: {best_name} (avg MAE: {best_cv_mae_avg:,.0f})')
+
         X_train, X_test, ym_train, ym_test, ymx_train, ymx_test = train_test_split(
             X, y_min, y_max, test_size=0.2, random_state=42
         )
 
-        # Train two GBM regressors: one for cost_min, one for cost_max
-        params = dict(n_estimators=300, max_depth=5, learning_rate=0.05,
-                      subsample=0.8, min_samples_leaf=3, random_state=42)
-
-        _append_log(run_id, 'Training GBM for cost_min…')
-        model_min = GradientBoostingRegressor(**params)
+        # Train selected regressor family: one model per target.
+        _append_log(run_id, f'Training {best_name} for cost_min…')
+        model_min = best_factory()
         model_min.fit(X_train, ym_train)
 
-        _append_log(run_id, 'Training GBM for cost_max…')
-        model_max = GradientBoostingRegressor(**params)
+        _append_log(run_id, f'Training {best_name} for cost_max…')
+        model_max = best_factory()
         model_max.fit(X_train, ymx_train)
 
         # Evaluate
@@ -338,6 +458,10 @@ def _run_training(version_id: str, run_id: str, version_label: str):
         r2_max    = float(r2_score(ymx_test, pred_max))
 
         _append_log(run_id, f'Eval — MAE min: ₹{mae_min:,.0f}, max: ₹{mae_max:,.0f} | R² min: {r2_min:.3f}, max: {r2_max:.3f}')
+
+        best_beats_rule = best_cv_mae_avg < rb_mae_avg
+        should_promote = best_beats_rule or force_best_model
+        _append_log(run_id, f'Promotion gate — best_beats_rule={best_beats_rule}, force_best_model={force_best_model}, promote={should_promote}')
 
         # Save models to Supabase Storage
         base_path = f'{version_label}/model'
@@ -355,14 +479,16 @@ def _run_training(version_id: str, run_id: str, version_label: str):
 
         duration = int(time.time() - start)
 
-        # Deactivate old active model
-        supabase.table('model_versions').update({'is_active': False}) \
-            .eq('is_active', True).execute()
+        if should_promote:
+            # Deactivate old active model
+            supabase.table('model_versions').update({'is_active': False}) \
+                .eq('is_active', True).execute()
 
         # Update model_versions row
         supabase.table('model_versions').update({
             'status':            'ready',
-            'is_active':         True,
+            'is_active':         should_promote,
+            'algorithm':         best_name,
             'training_set_size': len(labels),
             'test_set_size':     len(X_test),
             'mae_min':           round(mae_min, 2),
@@ -371,7 +497,7 @@ def _run_training(version_id: str, run_id: str, version_label: str):
             'r2_max':            round(r2_max, 4),
             'model_file_path':   f'{base_path}.joblib',
             'trained_at':        datetime.utcnow().isoformat(),
-            'feature_cols':      ['clip_512' if emb_map else 'rule_based', 'function_type', 'style', 'complexity', 'city_mult', 'hotel_decor_mult'],
+            'feature_cols':      ['clip_512' if use_clip_features else 'rule_based', 'function_type', 'style', 'complexity', 'city_mult', 'hotel_decor_mult'],
         }).eq('id', version_id).execute()
 
         supabase.table('training_runs').update({
@@ -380,13 +506,17 @@ def _run_training(version_id: str, run_id: str, version_label: str):
             'duration_seconds': duration,
         }).eq('id', run_id).execute()
 
-        _append_log(run_id, f'✓ Training complete in {duration}s. Model {version_label} is now active.')
+        if should_promote:
+            _append_log(run_id, f'✓ Training complete in {duration}s. Model {version_label} ({best_name}) is now active.')
+        else:
+            _append_log(run_id, f'✓ Training complete in {duration}s. Model {version_label} ({best_name}) kept inactive because rule-based baseline is better (override disabled).')
 
-        # Reload into memory
+        # Reload into memory only if promoted.
         global _active_model_min, _active_model_max, _active_version_id
-        _active_model_min  = model_min
-        _active_model_max  = model_max
-        _active_version_id = version_id
+        if should_promote:
+            _active_model_min  = model_min
+            _active_model_max  = model_max
+            _active_version_id = version_id
 
     except Exception as e:
         tb = traceback.format_exc()

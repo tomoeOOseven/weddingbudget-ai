@@ -42,7 +42,7 @@ services:
     runtime: python
     rootDir: ml_service
     plan: starter
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && pip install git+https://github.com/openai/CLIP.git
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:

@@ -66,12 +66,16 @@ async function embedImage(imageId, imageUrl, storagePath = null) {
  * Trigger a training run.
  * @param {string} versionLabel  — e.g. "v1.2"
  * @param {string} triggeredBy   — admin profile UUID
+ * @param {boolean|null} forceBestModel — promote best learned model even if it does not beat rule-based
+ * @param {string|null} forceAlgorithm — force one algorithm name for this run
  */
-async function triggerTraining(versionLabel, triggeredBy = null) {
+async function triggerTraining(versionLabel, triggeredBy = null, forceBestModel = null, forceAlgorithm = null) {
   try {
     const { data } = await axios.post(`${ML_URL}/train`, {
       version_label: versionLabel,
       triggered_by:  triggeredBy,
+      force_best_model: forceBestModel,
+      force_algorithm: forceAlgorithm,
     }, { timeout: 10000 });
     return data;
   } catch (err) {

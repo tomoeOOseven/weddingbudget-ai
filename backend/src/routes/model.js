@@ -17,11 +17,17 @@ router.get('/status', requireAdmin, async (req, res) => {
 
 // POST /api/model/train
 router.post('/train', requireAdmin, async (req, res) => {
-  const { versionLabel } = req.body;
+  const { versionLabel, forceBestModel, forceAlgorithm } = req.body;
   if (!versionLabel?.trim()) return res.status(400).json({ error: 'versionLabel is required.' });
+  if (forceBestModel !== undefined && typeof forceBestModel !== 'boolean') {
+    return res.status(400).json({ error: 'forceBestModel must be a boolean when provided.' });
+  }
+  if (forceAlgorithm !== undefined && typeof forceAlgorithm !== 'string') {
+    return res.status(400).json({ error: 'forceAlgorithm must be a string when provided.' });
+  }
 
   try {
-    const data = await triggerTraining(versionLabel.trim(), req.profile.id);
+    const data = await triggerTraining(versionLabel.trim(), req.profile.id, forceBestModel ?? null, forceAlgorithm?.trim()?.toLowerCase() || null);
     if (data === null) return res.status(503).json({ error: 'ML service is unavailable. Start the ml_service and try again.' });
     res.json(data);
   } catch (err) {
