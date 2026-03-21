@@ -13,6 +13,10 @@ const configuredOrigins = (process.env.FRONTEND_URL || '')
   .map((s) => s.trim())
   .filter(Boolean);
 const localOrigins = ['http://localhost:5173', 'http://localhost:3000'];
+const trustedOriginPatterns = [
+  /^https:\/\/[a-z0-9-]+\.vercel\.app$/i,
+  /^https:\/\/([a-z0-9-]+\.)?weddingbudget\.ai$/i,
+];
 const allowedOrigins = [
   ...configuredOrigins,
   ...(process.env.NODE_ENV === 'production' ? [] : localOrigins),
@@ -24,6 +28,7 @@ app.use(cors({
     // Allow non-browser requests (health checks, server-to-server).
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (trustedOriginPatterns.some((re) => re.test(origin))) return callback(null, true);
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
 }));
