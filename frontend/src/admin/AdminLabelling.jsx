@@ -457,6 +457,15 @@ export default function AdminLabelling() {
     } catch (e) { setBatchMsg(`Error: ${e.message}`); }
   }
 
+  const allVisibleSelected = images.length > 0 && images.every(img => batchSelected.has(img.id));
+
+  function handleSelectAllVisible() {
+    setBatchSelected(sel => {
+      if (allVisibleSelected) return new Set();
+      return new Set(images.map(img => img.id));
+    });
+  }
+
   const S = {
     topbar: { display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:12 },
     stats:  { display:'flex', gap:12, flexWrap:'wrap', marginBottom:20 },
@@ -540,6 +549,16 @@ export default function AdminLabelling() {
               : `${batchSelected.size} image${batchSelected.size > 1 ? 's' : ''} selected — mode: ${bypass ? 'auto-approve' : 'review'}`}
           </div>
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+            <button
+              disabled={images.length === 0}
+              onClick={handleSelectAllVisible}
+              style={{ padding:'8px 12px', background:'transparent', border:'1px solid #E8C97A', borderRadius:7,
+                color:'#E8C97A', fontSize:12, fontWeight:700,
+                cursor: images.length ? 'pointer' : 'default',
+                opacity: images.length ? 1 : 0.4, fontFamily:"'Jost',sans-serif" }}
+            >
+              {allVisibleSelected ? 'Clear All' : `Select All (${images.length})`}
+            </button>
             {batchMsg && (
               <span style={{ fontSize:12, color: batchMsg.startsWith('Error') ? '#ff8080' : '#86efac' }}>
                 {batchMsg}
