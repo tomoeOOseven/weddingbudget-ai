@@ -8,10 +8,25 @@ const rateLimit = require('express-rate-limit');
 const app  = express();
 const PORT = process.env.PORT || 4000;
 
+const configuredOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const localOrigins = ['http://localhost:5173', 'http://localhost:3000'];
+const allowedOrigins = [
+  ...configuredOrigins,
+  ...(process.env.NODE_ENV === 'production' ? [] : localOrigins),
+];
+
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: process.env.NODE_ENV === 'production'
-  ? [process.env.FRONTEND_URL].filter(Boolean)
-  : ['http://localhost:5173', 'http://localhost:3000'] }));
+app.use(cors({
+  origin(origin, callback) {
+    // Allow non-browser requests (health checks, server-to-server).
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+}));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '4mb' }));
 app.use('/api/', rateLimit({ windowMs: 60000, max: 200, message: { error: 'Too many requests' } }));
