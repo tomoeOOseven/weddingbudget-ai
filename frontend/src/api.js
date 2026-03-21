@@ -1,13 +1,12 @@
 // api.js — all backend calls, auth-aware
 import { getToken } from './lib/tokenStore.js';
-
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+import { fetchFromApi } from './lib/apiBase.js';
 
 async function request(path, options = {}) {
   const token = getToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetchFromApi(path, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `Request failed: ${res.status}`);
@@ -48,7 +47,7 @@ export const saveScenario        = (data) => request('/api/report/scenarios', { 
 
 export const downloadPDF = async (payload) => {
   const token = getToken();
-  const res = await fetch(`${BASE}/api/report/pdf`, {
+  const res = await fetchFromApi('/api/report/pdf', {
     method:'POST',
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) },
     body: JSON.stringify(payload),
@@ -59,7 +58,7 @@ export const downloadPDF = async (payload) => {
 
 export const downloadXLSX = async (payload) => {
   const token = getToken();
-  const res = await fetch(`${BASE}/api/report/xlsx`, {
+  const res = await fetchFromApi('/api/report/xlsx', {
     method:'POST',
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) },
     body: JSON.stringify(payload),

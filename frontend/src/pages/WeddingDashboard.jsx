@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { getToken } from '../lib/tokenStore.js';
 import { fetchWeddings, createWedding } from '../api.js';
-
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 function fmt(n) { return n ? '₹' + Number(n).toLocaleString('en-IN') : '—'; }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : null; }

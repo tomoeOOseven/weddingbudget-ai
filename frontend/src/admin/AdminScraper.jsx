@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getToken } from '../lib/tokenStore.js';
-
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+import { fetchFromApi } from '../lib/apiBase.js';
 
 async function apiFetch(path, opts = {}) {
   const token = getToken();
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetchFromApi(path, {
     ...opts,
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}), ...(opts.headers ?? {}) },
   });

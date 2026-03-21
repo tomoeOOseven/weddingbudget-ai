@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getToken } from '../lib/tokenStore.js';
+import { fetchFromApi } from '../lib/apiBase.js';
 
 // Map URL path → default tab
 const PATH_TO_TAB = {
@@ -11,11 +12,9 @@ const PATH_TO_TAB = {
   '/admin/audit':     'audit',
 };
 
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
-
 async function apiFetch(path, opts = {}) {
   const token = getToken();
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetchFromApi(path, {
     ...opts,
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}), ...(opts.headers ?? {}) },
   });

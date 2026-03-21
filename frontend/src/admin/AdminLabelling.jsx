@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getToken } from '../lib/tokenStore.js';
-
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+import { fetchFromApi } from '../lib/apiBase.js';
 
 const FUNCTIONS    = ['haldi','mehendi','sangeet','baraat','pheras','reception','other'];
 const STYLES       = ['Traditional','Boho','Modern','Contemporary','Romantic','Opulent','Rustic','Vintage'];
@@ -11,7 +10,7 @@ const COMPLEXITY_COLOR = { low:'#16a34a', medium:'#d97706', high:'#dc2626', ultr
 
 async function apiFetch(path, opts = {}) {
   const token = getToken();
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetchFromApi(path, {
     ...opts,
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}), ...(opts.headers ?? {}) },
   });
