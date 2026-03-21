@@ -15,6 +15,7 @@ const S = {
   btn:  (dis) => ({ width:'100%', padding:'13px', background:'var(--maroon)', border:'none', borderRadius:8, color:'var(--gold)', fontSize:14, fontWeight:700, cursor:dis?'default':'pointer', opacity:dis?0.5:1, fontFamily:"'Jost',sans-serif", letterSpacing:'0.5px', marginTop:4 }),
   err:  { background:'rgba(220,53,69,0.08)', border:'1px solid rgba(220,53,69,0.2)', borderRadius:8, padding:'10px 14px', color:'#dc2626', fontSize:12, marginBottom:16, lineHeight:1.5 },
   ok:   { background:'rgba(22,163,74,0.08)', border:'1px solid rgba(22,163,74,0.2)', borderRadius:8, padding:'10px 14px', color:'#15803d', fontSize:12, marginBottom:16 },
+  linkBtn: { background:'none', border:'none', color:'var(--maroon)', fontSize:12, cursor:'pointer', textDecoration:'underline', padding:0, marginBottom:14, fontFamily:"'Jost',sans-serif" },
 };
 
 export default function ClientLogin() {
@@ -54,6 +55,28 @@ export default function ClientLogin() {
     finally { setLoading(false); }
   }
 
+  async function handleForgotPassword() {
+    setError('');
+    setOk('');
+    if (!email.trim()) {
+      setError('Enter your email first, then click Forgot password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/login`,
+      });
+      if (err) throw err;
+      setOk('Password reset email sent. Check your inbox.');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div style={S.page}>
       <div style={S.card}>
@@ -79,6 +102,11 @@ export default function ClientLogin() {
           <input style={S.input} type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
           <label style={S.label}>Password</label>
           <input style={S.input} type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••••" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+          {mode === 'login' && (
+            <button type="button" style={S.linkBtn} onClick={handleForgotPassword} disabled={loading}>
+              Forgot password?
+            </button>
+          )}
           <button type="submit" style={S.btn(loading || !email || !password)} disabled={loading || !email || !password}>
             {loading ? (mode === 'login' ? 'Signing in…' : 'Creating account…') : (mode === 'login' ? 'Sign In' : 'Create Account')}
           </button>

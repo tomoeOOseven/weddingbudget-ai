@@ -12,9 +12,11 @@ import Step6Sundries      from './components/Step6Sundries.jsx';
 import Step7Report        from './components/Step7Report.jsx';
 import { useAuth }        from './context/AuthContext.jsx';
 import WeddingDashboard   from './pages/WeddingDashboard.jsx';
+import { useNavigate }    from 'react-router-dom';
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [refData, setRefData]   = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [apiError, setApiError] = useState(false);
@@ -74,9 +76,13 @@ export default function App() {
           </div>
         </div>
         <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-          {user && (
+          {user ? (
             <button onClick={() => setActiveWedding(null)} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
               ← My Weddings
+            </button>
+          ) : (
+            <button onClick={() => navigate('/login')} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
+              Sign in
             </button>
           )}
           <div style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:8, padding:'10px 16px' }}>

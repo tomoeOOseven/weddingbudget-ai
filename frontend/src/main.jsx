@@ -17,35 +17,33 @@ import ClientLogin          from './pages/ClientLogin.jsx';
 import App                  from './App.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Client app */}
-          <Route path="/"      element={<App />} />
-          <Route path="/login" element={<ClientLogin />} />
+  <AuthProvider>
+    <BrowserRouter>
+      <Routes>
+        {/* Client app */}
+        <Route path="/"      element={<App />} />
+        <Route path="/login" element={<ClientLogin />} />
 
-          {/* Admin auth */}
-          <Route path="/admin/login" element={<AdminLogin />} />
+        {/* Admin auth */}
+        <Route path="/admin/login" element={<AdminLogin />} />
 
-          {/* Admin shell */}
-          <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-            <Route index         element={<AdminDashboard />} />
-            <Route path="scraper"   element={<AdminScraper />} />
-            <Route path="labelling" element={<AdminLabelling />} />
-            <Route path="model"     element={<AdminModel />} />
-            <Route path="artists"   element={<AdminCostData />} />
-            <Route path="fb"        element={<AdminCostData />} />
-            <Route path="logistics" element={<AdminCostData />} />
-            <Route path="cities"    element={<AdminCostData />} />
-            <Route path="decor"     element={<AdminPlaceholder icon="💐" title="Decor Library" description="Manage seed decor items. Scraped images are managed via the Labelling Queue." />} />
-            <Route path="audit"     element={<AdminCostData />} />
-            <Route path="*"         element={<Navigate to="/admin" replace />} />
-          </Route>
+        {/* Admin shell */}
+        <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+          <Route index         element={<AdminDashboard />} />
+          <Route path="scraper"   element={<AdminScraper />} />
+          <Route path="labelling" element={<AdminLabelling />} />
+          <Route path="model"     element={<AdminModel />} />
+          <Route path="artists"   element={<AdminCostData />} />
+          <Route path="fb"        element={<AdminCostData />} />
+          <Route path="logistics" element={<AdminCostData />} />
+          <Route path="cities"    element={<AdminCostData />} />
+          <Route path="decor"     element={<AdminPlaceholder icon="💐" title="Decor Library" description="Manage seed decor items. Scraped images are managed via the Labelling Queue." />} />
+          <Route path="audit"     element={<AdminCostData />} />
+          <Route path="*"         element={<Navigate to="/admin" replace />} />
+        </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  </React.StrictMode>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  </AuthProvider>
 );

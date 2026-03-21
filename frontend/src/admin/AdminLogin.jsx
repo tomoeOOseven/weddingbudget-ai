@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { supabase } from '../lib/supabase.js';
 
 const S = {
   page: {
@@ -45,6 +46,16 @@ const S = {
     borderRadius: 8, padding: '12px 16px', color: '#ff8080',
     fontSize: 13, marginBottom: 20, lineHeight: 1.5,
   },
+  ok: {
+    background: 'rgba(22,163,74,0.14)', border: '1px solid rgba(22,163,74,0.35)',
+    borderRadius: 8, padding: '12px 16px', color: '#8dffb3',
+    fontSize: 13, marginBottom: 20, lineHeight: 1.5,
+  },
+  linkBtn: {
+    background: 'none', border: 'none', padding: 0, marginTop: -8, marginBottom: 14,
+    color: 'rgba(232,201,122,0.85)', textDecoration: 'underline',
+    fontSize: 12, cursor: 'pointer', fontFamily: "'Jost', sans-serif",
+  },
   badge: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     marginTop: 28, paddingTop: 20, borderTop: '1px solid rgba(232,201,122,0.1)',
@@ -60,6 +71,7 @@ export default function AdminLogin() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
+  const [ok, setOk]             = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [focusField, setFocusField] = useState('');
 
@@ -74,9 +86,20 @@ export default function AdminLogin() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setOk('');
     setSubmitting(true);
 
-    const { data, error: signInError } = await signIn(email.trim(), password);
+    let data;
+    let signInError;
+    try {
+      const res = await signIn(email.trim(), password);
+      data = res?.data;
+      signInError = res?.error;
+    } catch (err) {
+      setError(err?.message || 'Sign-in failed unexpectedly. Please retry.');
+      setSubmitting(false);
+      return;
+    }
 
     if (signInError) {
       setError(signInError.message);
@@ -84,17 +107,65 @@ export default function AdminLogin() {
       return;
     }
 
-    // Give AuthContext one tick to update profile + isAdmin from onAuthStateChange,
-    // then check if the signed-in user actually has admin access.
-    setTimeout(() => {
-      setSubmitting(false);
-      // isAdmin is derived from the profile that AuthContext just fetched.
-      // If it's still false at this point, the account doesn't have admin rights.
-      if (!isAdmin) {
-        setError('This account does not have admin access. Contact a super-admin.');
-        signOut();
+    try {
+      const userId = data?.user?.id;
+      if (!userId) {
+        setError('Sign-in succeeded but no user session was returned. Please try again.');
+        setSubmitting(false);
+        return;
       }
-    }, 800);
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        setError(`Could not load your profile: ${profileError.message}`);
+        await signOut();
+        setSubmitting(false);
+        return;
+      }
+
+      const hasAdminAccess = profile?.role === 'admin' || profile?.role === 'super_admin';
+      if (!hasAdminAccess) {
+        setError('This account does not have admin access. Contact a super-admin.');
+        await signOut();
+        setSubmitting(false);
+        return;
+      }
+
+      const dest = location.state?.from?.pathname ?? '/admin';
+      navigate(dest, { replace: true });
+    } catch (err) {
+      setError(err?.message || 'Sign-in failed unexpectedly. Please retry.');
+      await signOut();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError('');
+    setOk('');
+    if (!email.trim()) {
+      setError('Enter your admin email first, then click Forgot password.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/admin/login`,
+      });
+      if (resetErr) throw resetErr;
+      setOk('Password reset email sent. Check your inbox.');
+    } catch (err) {
+      setError(err?.message || 'Could not send reset email. Please retry.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -112,6 +183,7 @@ export default function AdminLogin() {
               : error}
           </div>
         )}
+        {ok && <div style={S.ok}>✓ {ok}</div>}
 
         <form onSubmit={handleSubmit}>
           <div style={S.fieldWrap}>
@@ -149,6 +221,10 @@ export default function AdminLogin() {
               placeholder="••••••••••••"
             />
           </div>
+
+          <button type="button" style={S.linkBtn} onClick={handleForgotPassword} disabled={submitting}>
+            Forgot password?
+          </button>
 
           <button
             type="submit"

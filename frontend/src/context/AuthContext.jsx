@@ -3,6 +3,48 @@ import { supabase } from '../lib/supabase.js';
 import { setToken } from '../lib/tokenStore.js';
 
 const AuthContext = createContext(null);
+let authOpQueue = Promise.resolve();
+
+function isSupabaseLockRace(error) {
+  const msg = error?.message ?? '';
+  return /Lock broken by another request with the 'steal' option/i.test(msg);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
+function isTimeoutError(error) {
+  const msg = error?.message ?? '';
+  return /timed out/i.test(msg);
+}
+
+function clearLocalAuthState() {
+  try {
+    localStorage.removeItem('wdtch-web-auth');
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-') && k.includes('auth-token'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch {
+    // ignore storage cleanup errors
+  }
+}
+
+function runAuthOp(task) {
+  const next = authOpQueue.then(
+    () => withTimeout(task(), 12000, 'Auth operation timed out. Please retry.'),
+    () => withTimeout(task(), 12000, 'Auth operation timed out. Please retry.')
+  );
+  authOpQueue = next.catch(() => {});
+  return next;
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null);
@@ -49,15 +91,49 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function signIn(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    return { data, error };
+    return runAuthOp(async () => {
+      // Supabase auth lock can race in local dev/browser-tab contention.
+      // Retry once on the known transient lock-steal error.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        let data;
+        let error;
+        try {
+          const res = await withTimeout(
+            supabase.auth.signInWithPassword({ email, password }),
+            10000,
+            'Sign-in request timed out. Please retry.'
+          );
+          data = res?.data;
+          error = res?.error;
+        } catch (err) {
+          if (attempt === 0 && isTimeoutError(err)) {
+            clearLocalAuthState();
+            await sleep(250);
+            continue;
+          }
+          return { data: null, error: { message: err?.message || 'Sign-in failed. Please retry.' } };
+        }
+
+        if (!error) return { data, error: null };
+        if (attempt === 0 && isSupabaseLockRace(error)) {
+          clearLocalAuthState();
+          await sleep(200);
+          continue;
+        }
+        return { data: null, error };
+      }
+
+      return { data: null, error: { message: 'Sign-in failed. Please retry.' } };
+    });
   }
 
   async function signOut() {
-    setToken(null);
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
+    return runAuthOp(async () => {
+      setToken(null);
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+    });
   }
 
   const isAdmin      = profile?.role === 'admin' || profile?.role === 'super_admin';
