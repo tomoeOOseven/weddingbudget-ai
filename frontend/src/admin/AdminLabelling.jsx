@@ -484,10 +484,13 @@ export default function AdminLabelling() {
       const status = tab === 'dataset' ? 'labelled' : 'raw';
       const pageLimit = 100;
       let pageOffset = 0;
-      const ids = [];
-      let done = false;
+      let expectedTotal = total;
+      let lastUniqueCount = -1;
+      const ids = new Set();
+      let safety = 0;
 
-      while (!done) {
+      while (safety < 200) {
+        safety += 1;
         const params = new URLSearchParams({
           limit: String(pageLimit),
           offset: String(pageOffset),
@@ -495,14 +498,33 @@ export default function AdminLabelling() {
         });
         const data = await apiFetch(`/api/labelling/queue?${params}`);
         const page = data.images ?? [];
+        expectedTotal = Number(data.total ?? expectedTotal ?? 0);
 
-        ids.push(...page.map(img => img.id));
-        done = page.length < pageLimit;
+        page
+          .map(img => img?.id)
+          .filter(id => typeof id === 'string' && id.length > 0)
+          .forEach(id => ids.add(id));
+
+        if (!page.length || ids.size >= expectedTotal || ids.size === lastUniqueCount) {
+          break;
+        }
+
+        lastUniqueCount = ids.size;
         pageOffset += pageLimit;
       }
 
+      if (ids.size === 0) {
+        setBatchMsg('No selectable images found.');
+        setBatchSelected(new Set());
+        return;
+      }
+
       setBatchSelected(new Set(ids));
-      setBatchMsg(`✓ Selected all available images (${ids.length}).`);
+      if (expectedTotal > 0 && ids.size < expectedTotal) {
+        setBatchMsg(`✓ Selected ${ids.size} unique images (expected ${expectedTotal}). You can still tag all selected.`);
+      } else {
+        setBatchMsg(`✓ Selected all available images (${ids.size}).`);
+      }
     } catch (e) {
       setBatchMsg(`Error: ${e.message}`);
     } finally {

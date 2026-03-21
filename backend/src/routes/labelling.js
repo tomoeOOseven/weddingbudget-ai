@@ -40,6 +40,7 @@ router.get('/queue', requireAdmin, async (req, res) => {
     `, { count: 'exact' })
     .eq('status', status)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (req.query.sourceId) query = query.eq('source_id', req.query.sourceId);
@@ -228,7 +229,14 @@ router.post('/autotag/batch', requireAdmin, async (req, res) => {
   const { data: images } = await supabaseAdmin
     .from('scraped_images').select('id, image_url, storage_path').in('id', imageIds);
 
-  if (!images?.length) return res.status(404).json({ error: 'No images found.' });
+  if (!images?.length) {
+    return res.json({
+      message: 'No matching images found for this batch chunk.',
+      count: 0,
+      bypass,
+      skipped: imageIds.length,
+    });
+  }
 
   res.json({
     message: `Batch auto-tag started for ${images.length} images (${bypass ? 'auto-approve' : 'review'} mode).`,
