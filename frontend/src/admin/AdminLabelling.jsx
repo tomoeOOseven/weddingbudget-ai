@@ -437,6 +437,17 @@ export default function AdminLabelling() {
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { loadImages(); setSelected(null); }, [loadImages]);
 
+  // Keep numbers and queue totals fresh while async batch labeling runs in the background.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      loadStats();
+      loadImages();
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [loadStats, loadImages]);
+
   function handleLabelled(imageId) {
     setImages(imgs => imgs.map(img => img.id === imageId ? { ...img, status: 'labelled' } : img));
     loadStats();
