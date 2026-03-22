@@ -128,7 +128,7 @@ export default function WeddingDashboard({ onSelectWedding }) {
                         {w.cities?.label && <span>📍 {w.cities.label}</span>}
                         {w.hotel_tiers?.label && <span>🏨 {w.hotel_tiers.label}</span>}
                         {w.total_guests && <span>👥 {w.total_guests} guests</span>}
-                        {w.wedding_date && <span>{fmtDate(w.wedding_date)}</span>}
+                        {w.wedding_date && <span>📅 {fmtDate(w.wedding_date)}</span>}
                       </div>
                     </div>
                     {estimate ? (
