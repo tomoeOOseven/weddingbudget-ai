@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { FiShield } from 'react-icons/fi';
 
 /**
  * Wraps any route that requires admin access.
@@ -21,7 +22,7 @@ export default function AdminRoute({ children }) {
         fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: '#E8C97A',
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>👑</div>
+          <div style={{ fontSize: 36, marginBottom: 12 }}><FiShield /></div>
           <div>Verifying credentials…</div>
         </div>
       </div>

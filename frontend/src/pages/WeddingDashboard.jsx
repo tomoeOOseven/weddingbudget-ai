@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { fetchWeddings, createWedding } from '../api.js';
+import { fetchWeddings, createWedding, deleteWedding } from '../api.js';
+import { FiCalendar, FiMapPin, FiTrash2, FiUserCheck, FiUsers } from 'react-icons/fi';
 
 function fmt(n) { return n ? '₹' + Number(n).toLocaleString('en-IN') : '—'; }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : null; }
@@ -39,6 +40,17 @@ export default function WeddingDashboard({ onSelectWedding }) {
     finally { setCreating(false); }
   }
 
+  async function handleDeleteWedding(e, weddingId) {
+    e.stopPropagation();
+    if (!confirm('Delete this wedding project? This cannot be undone.')) return;
+    try {
+      await deleteWedding(weddingId);
+      setWeddings(list => list.filter(w => w.id !== weddingId));
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
   const S = {
     page: { minHeight:'100vh', background:'var(--cream)', fontFamily:"'Jost',sans-serif" },
     header: { background:'var(--maroon)', padding:'16px 28px', display:'flex', justifyContent:'space-between', alignItems:'center' },
@@ -58,7 +70,7 @@ export default function WeddingDashboard({ onSelectWedding }) {
       <div style={S.header}>
         <div>
           <div style={S.logo}>WeddingBudget<span>.ai</span></div>
-          <div style={S.greeting}>Welcome back, {profile?.full_name?.split(' ')[0] ?? 'there'} 👋</div>
+          <div style={S.greeting}>Welcome back, {profile?.full_name?.split(' ')[0] ?? 'there'} <FiUserCheck style={{ verticalAlign:'middle' }} /></div>
         </div>
         <button onClick={signOut} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:12, padding:'7px 14px', cursor:'pointer', fontFamily:"'Jost',sans-serif" }}>
           Sign out
@@ -110,7 +122,7 @@ export default function WeddingDashboard({ onSelectWedding }) {
           <div style={{ textAlign:'center', padding:'48px', color:'var(--muted)', fontSize:14 }}>Loading your weddings…</div>
         ) : weddings.length === 0 && !showCreate ? (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
-            <div style={{ fontSize:48, marginBottom:16 }}>💒</div>
+            <div style={{ fontSize:48, marginBottom:16, color:'var(--maroon)' }}><FiCalendar style={{ verticalAlign:'middle' }} /></div>
             <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:'var(--maroon)', marginBottom:8 }}>No weddings yet</div>
             <div style={{ color:'var(--muted)', fontSize:13, marginBottom:24 }}>Create your first wedding project to start building a budget estimate.</div>
             <button style={S.newBtn} onClick={() => setShowCreate(true)}>+ Create Your First Wedding</button>
@@ -125,10 +137,10 @@ export default function WeddingDashboard({ onSelectWedding }) {
                     <div>
                       <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)', fontWeight:700 }}>{w.name}</div>
                       <div style={{ fontSize:12, color:'var(--muted)', marginTop:4, display:'flex', gap:12 }}>
-                        {w.cities?.label && <span>📍 {w.cities.label}</span>}
-                        {w.hotel_tiers?.label && <span>🏨 {w.hotel_tiers.label}</span>}
-                        {w.total_guests && <span>👥 {w.total_guests} guests</span>}
-                        {w.wedding_date && <span>📅 {fmtDate(w.wedding_date)}</span>}
+                        {w.cities?.label && <span><FiMapPin style={{ verticalAlign:'middle' }} /> {w.cities.label}</span>}
+                        {w.hotel_tiers?.label && <span><FiCalendar style={{ verticalAlign:'middle' }} /> {w.hotel_tiers.label}</span>}
+                        {w.total_guests && <span><FiUsers style={{ verticalAlign:'middle' }} /> {w.total_guests} guests</span>}
+                        {w.wedding_date && <span><FiCalendar style={{ verticalAlign:'middle' }} /> {fmtDate(w.wedding_date)}</span>}
                       </div>
                     </div>
                     {estimate ? (
@@ -139,9 +151,28 @@ export default function WeddingDashboard({ onSelectWedding }) {
                         </div>
                       </div>
                     ) : (
-                      <div style={{ fontSize:12, color:'var(--muted)', fontStyle:'italic' }}>No estimate yet — click to start</div>
+                      <div style={{ fontSize:12, color:'var(--muted)', fontStyle:'italic' }}>No estimate yet - click to start</div>
                     )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteWedding(e, w.id)}
+                    style={{
+                      marginTop: 10,
+                      background: 'transparent',
+                      border: '1px solid var(--border)',
+                      color: '#b91c1c',
+                      borderRadius: 6,
+                      fontSize: 12,
+                      padding: '6px 10px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <FiTrash2 /> Delete
+                  </button>
                 </HoverCard>
               );
             })}

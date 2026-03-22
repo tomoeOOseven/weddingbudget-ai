@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BtnPrimary, BtnOutline, CAT_COLORS, fmt } from './ui.jsx';
 import { downloadPDF, downloadXLSX, fetchActuals, addActual, updateActual, deleteActual, fetchScenarios, saveScenario } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { FiBarChart2, FiDownload, FiFileText, FiX } from 'react-icons/fi';
 
 // ── PDF Export ────────────────────────────────────────────────────────────────
 function ExportButton({ budget, inputs }) {
@@ -20,12 +21,15 @@ function ExportButton({ budget, inputs }) {
   async function handlePDF() {
     setPdfLoading(true);
     try {
-      const blob = await downloadPDF(buildPayload());
+      const { blob, contentType } = await downloadPDF(buildPayload());
+      if (!contentType.includes('application/pdf')) {
+        throw new Error('Backend did not return a PDF document.');
+      }
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href = url; a.download = 'WeddingBudget_Estimate.pdf'; a.click();
       URL.revokeObjectURL(url);
-    } catch { alert('PDF export requires the backend to be running.'); }
+    } catch (err) { alert(err.message || 'PDF export requires the backend to be running.'); }
     finally { setPdfLoading(false); }
   }
 
@@ -43,8 +47,8 @@ function ExportButton({ budget, inputs }) {
 
   return (
     <>
-      <BtnOutline onClick={handlePDF}  disabled={pdfLoading}>{pdfLoading  ? 'Generating…' : '📥 Export PDF'}</BtnOutline>
-      <BtnOutline onClick={handleXLSX} disabled={xlsxLoading}>{xlsxLoading ? 'Generating…' : '📊 Export Excel'}</BtnOutline>
+      <BtnOutline onClick={handlePDF}  disabled={pdfLoading}>{pdfLoading  ? 'Generating…' : <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}><FiDownload /> Export PDF</span>}</BtnOutline>
+      <BtnOutline onClick={handleXLSX} disabled={xlsxLoading}>{xlsxLoading ? 'Generating…' : <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}><FiBarChart2 /> Export Excel</span>}</BtnOutline>
     </>
   );
 }
@@ -76,7 +80,7 @@ function ScenarioComparison({ weddingId, currentTotal }) {
 
   return (
     <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px', marginBottom:16 }}>
-      <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)', marginBottom:14 }}>📊 Scenario Comparison</div>
+      <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)', marginBottom:14 }}><FiBarChart2 style={{ verticalAlign:'middle', marginRight:8 }} />Scenario Comparison</div>
       {scenarios.length === 0 ? (
         <p style={{ fontSize:13, color:'var(--muted)', marginBottom:14 }}>Save the current estimate as a named scenario to compare options (e.g. "Palace vs City Hotel").</p>
       ) : (
@@ -151,9 +155,9 @@ function BudgetTracker({ weddingId, estimatedItems }) {
   return (
     <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px', marginBottom:16 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)' }}>📋 Actuals Tracker</div>
+        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)' }}><FiFileText style={{ verticalAlign:'middle', marginRight:8 }} />Actuals Tracker</div>
         <button onClick={() => setAdding(!adding)} style={{ padding:'7px 14px', background: adding ? 'transparent' : 'var(--maroon)', border:'1px solid var(--maroon)', borderRadius:7, color: adding ? 'var(--maroon)' : '#E8C97A', fontSize:12, fontWeight:700, cursor:'pointer' }}>
-          {adding ? '✕ Cancel' : '+ Log Actual'}
+          {adding ? <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}><FiX /> Cancel</span> : '+ Log Actual'}
         </button>
       </div>
 
@@ -215,7 +219,7 @@ function BudgetTracker({ weddingId, estimatedItems }) {
               </div>
               <div style={{ display:'flex', gap:12, alignItems:'center' }}>
                 <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:16, fontWeight:700, color:'var(--maroon)' }}>{fmt(a.actual_amount)}</div>
-                <button onClick={() => handleDelete(a.id)} style={{ background:'none', border:'none', color:'#dc2626', cursor:'pointer', fontSize:14 }}>✕</button>
+                <button onClick={() => handleDelete(a.id)} style={{ background:'none', border:'none', color:'#dc2626', cursor:'pointer', fontSize:14 }}><FiX /></button>
               </div>
             </div>
           ))}

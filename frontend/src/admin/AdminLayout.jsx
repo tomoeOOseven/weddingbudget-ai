@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { FiActivity, FiBarChart2, FiBookOpen, FiClipboard, FiGrid, FiMic, FiShield, FiTag, FiTool, FiTruck } from 'react-icons/fi';
 
 // ── Nav items ──────────────────────────────────────────────────────────────
 
@@ -8,31 +9,31 @@ const NAV = [
   {
     section: 'Overview',
     items: [
-      { path: '/admin',          label: 'Dashboard',       icon: '📊', exact: true },
+      { path: '/admin',          label: 'Dashboard',       icon: <FiBarChart2 />, exact: true },
     ],
   },
   {
     section: 'Data Pipeline',
     items: [
-      { path: '/admin/scraper',  label: 'Scraper Control', icon: '🕷️' },
-      { path: '/admin/labelling',label: 'Labelling Queue', icon: '🏷️' },
-      { path: '/admin/model',    label: 'Model Training',  icon: '🧠' },
+      { path: '/admin/scraper',  label: 'Scraper Control', icon: <FiTool /> },
+      { path: '/admin/labelling',label: 'Labelling Queue', icon: <FiTag /> },
+      { path: '/admin/model',    label: 'Model Training',  icon: <FiActivity /> },
     ],
   },
   {
     section: 'Cost Data',
     items: [
-      { path: '/admin/artists',  label: 'Artists',         icon: '🎤' },
-      { path: '/admin/fb',       label: 'F&B Rates',       icon: '🍽️' },
-      { path: '/admin/logistics',label: 'Logistics',       icon: '🚗' },
-      { path: '/admin/cities',   label: 'Cities',          icon: '🏙️' },
-      { path: '/admin/decor',    label: 'Decor Library',   icon: '💐' },
+      { path: '/admin/artists',  label: 'Artists',         icon: <FiMic /> },
+      { path: '/admin/fb',       label: 'F&B Rates',       icon: <FiGrid /> },
+      { path: '/admin/logistics',label: 'Logistics',       icon: <FiTruck /> },
+      { path: '/admin/cities',   label: 'Cities',          icon: <FiGrid /> },
+      { path: '/admin/decor',    label: 'Decor Library',   icon: <FiBookOpen /> },
     ],
   },
   {
     section: 'System',
     items: [
-      { path: '/admin/audit',    label: 'Audit Log',       icon: '📋' },
+      { path: '/admin/audit',    label: 'Audit Log',       icon: <FiClipboard /> },
     ],
   },
 ];
@@ -186,7 +187,7 @@ export default function AdminLayout() {
         <header style={S.header}>
           <div style={S.headerTitle}>Events by Athea</div>
           <div style={S.headerMeta}>
-            <span style={S.headerBadge}>🛡 Admin</span>
+            <span style={S.headerBadge}><FiShield style={{ verticalAlign: 'middle', marginRight: 6 }} />Admin</span>
             <span style={{ fontSize: 12, color: '#999' }}>
               {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long' })}
             </span>

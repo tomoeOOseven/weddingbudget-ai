@@ -1,6 +1,17 @@
 // Step1EventDetails.jsx
 import React from 'react';
 import { Card, Label, SubText, BigNum, Chip, fmt } from './ui.jsx';
+import { FiCalendar, FiFeather, FiGift, FiMusic, FiStar, FiSun, FiUsers } from 'react-icons/fi';
+
+const FUNCTION_ICON = {
+  haldi: FiSun,
+  mehendi: FiFeather,
+  sangeet: FiMusic,
+  baraat: FiUsers,
+  pheras: FiStar,
+  reception: FiGift,
+  other: FiCalendar,
+};
 
 export default function Step1EventDetails({ inputs, set, toggle, refData, cm, hd }) {
   // cities and hotelTiers are now slug-keyed objects e.g. { udaipur: { mult, label }, ... }
@@ -77,7 +88,11 @@ export default function Step1EventDetails({ inputs, set, toggle, refData, cm, hd
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
           {funs.map(f => (
             <Chip key={f.id} on={inputs.functions.has(f.id)} onClick={() => toggle('functions', f.id)}>
-              <span style={{ fontSize:16 }}>{f.emoji}</span>{f.label}
+              {(() => {
+                const Icon = FUNCTION_ICON[f.id] || FiCalendar;
+                return <span style={{ fontSize:16, display:'inline-flex' }}><Icon /></span>;
+              })()}
+              {f.label}
             </Chip>
           ))}
         </div>

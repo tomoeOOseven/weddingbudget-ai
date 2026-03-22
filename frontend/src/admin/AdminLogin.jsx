@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
+import { FiAlertTriangle, FiCheck, FiLock } from 'react-icons/fi';
 
 const S = {
   page: {
@@ -178,12 +179,12 @@ export default function AdminLogin() {
 
         {error && (
           <div style={S.error}>
-            ⚠️ {error === 'Invalid login credentials'
+            <FiAlertTriangle style={{ verticalAlign: 'middle', marginRight: 6 }} /> {error === 'Invalid login credentials'
               ? 'Incorrect email or password. Make sure your account has admin access.'
               : error}
           </div>
         )}
-        {ok && <div style={S.ok}>✓ {ok}</div>}
+        {ok && <div style={S.ok}><FiCheck style={{ verticalAlign: 'middle', marginRight: 6 }} /> {ok}</div>}
 
         <form onSubmit={handleSubmit}>
           <div style={S.fieldWrap}>
@@ -236,7 +237,7 @@ export default function AdminLogin() {
         </form>
 
         <div style={S.badge}>
-          <span>🔒</span>
+          <span><FiLock /></span>
           <span>Restricted to Events by Athea team</span>
         </div>
       </div>

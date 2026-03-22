@@ -12,10 +12,11 @@ import Step6Sundries      from './components/Step6Sundries.jsx';
 import Step7Report        from './components/Step7Report.jsx';
 import { useAuth }        from './context/AuthContext.jsx';
 import WeddingDashboard   from './pages/WeddingDashboard.jsx';
-import { useNavigate }    from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { FiAlertTriangle, FiLoader } from 'react-icons/fi';
 
 export default function App() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [refData, setRefData]   = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -40,6 +41,10 @@ export default function App() {
   // Auth loading
   if (authLoading) {
     return <Loader text="WeddingBudget.ai…" />;
+  }
+
+  if (user && isAdmin) {
+    return <Navigate to="/admin" replace />;
   }
 
   // Logged in but haven't selected a wedding yet
@@ -96,7 +101,7 @@ export default function App() {
 
       {apiError && (
         <div style={{ background:'#FFF3CD', borderBottom:'1px solid #FDEEBA', padding:'8px 28px', fontSize:12, color:'#856404' }}>
-          ⚠️ Backend not detected — running with bundled fallback data.
+          <span style={{ display:'inline-flex', gap:6, alignItems:'center' }}><FiAlertTriangle /> Backend not detected - running with bundled fallback data.</span>
         </div>
       )}
 
@@ -115,7 +120,7 @@ export default function App() {
 function Loader({ text }) {
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', fontFamily:"'Cormorant Garamond',serif", fontSize:24, color:'var(--maroon)' }}>
-      🌸 {text}
+      <span style={{ display:'inline-flex', alignItems:'center', gap:10 }}><FiLoader /> {text}</span>
     </div>
   );
 }

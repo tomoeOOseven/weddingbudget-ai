@@ -4,6 +4,7 @@ const cors    = require('cors');
 const helmet  = require('helmet');
 const morgan  = require('morgan');
 const rateLimit = require('express-rate-limit');
+const { startEmbeddedMlService } = require('./lib/mlBootstrap');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -59,7 +60,22 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
+const mlChild = startEmbeddedMlService();
+
+function shutdown() {
+  if (mlChild && !mlChild.killed) {
+    mlChild.kill();
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
 app.listen(PORT, () => {
   console.log(`\n🌸 WeddingBudget.ai API v2 running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health\n`);
+  if (mlChild) {
+    console.log('   Embedded ML service mode: enabled');
+  }
 });

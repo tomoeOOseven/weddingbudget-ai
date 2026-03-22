@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getToken } from '../lib/tokenStore.js';
 import { fetchFromApi } from '../lib/apiBase.js';
+import { FiCheck, FiExternalLink, FiSearch, FiTag, FiX } from 'react-icons/fi';
 
 const FUNCTIONS    = ['haldi','mehendi','sangeet','baraat','pheras','reception','other'];
 const STYLES       = ['Traditional','Boho','Modern','Contemporary','Romantic','Opulent','Rustic','Vintage'];
 const COMPLEXITIES = ['low','medium','high','ultra'];
-const FN_EMOJI     = { haldi:'💛', mehendi:'🌿', sangeet:'🎵', baraat:'🐴', pheras:'🔥', reception:'✨', other:'📷' };
+const FN_BADGE     = { haldi:'H', mehendi:'M', sangeet:'S', baraat:'B', pheras:'P', reception:'R', other:'O' };
 const COMPLEXITY_COLOR = { low:'#16a34a', medium:'#d97706', high:'#dc2626', ultra:'#7c3aed' };
 
 async function apiFetch(path, opts = {}) {
@@ -64,7 +65,7 @@ function ImageCard({ image, onClick, selected }) {
         {isLabelled && (
           <div style={{ position:'absolute', top:8, right:8, background:'#16a34a', color:'#fff',
             fontSize:9, fontWeight:700, padding:'3px 8px', borderRadius:20, letterSpacing:'1px' }}>
-            ✓ LABELLED
+            LABELLED
           </div>
         )}
       </div>
@@ -113,7 +114,7 @@ function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Lab
           <label style={S.label}>Function</label>
           <select style={S.sel} value={form.function_type} onChange={e => set('function_type', e.target.value)}>
             <option value="">Select…</option>
-            {FUNCTIONS.map(f => <option key={f} value={f}>{FN_EMOJI[f]} {f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
+            {FUNCTIONS.map(f => <option key={f} value={f}>[{FN_BADGE[f]}] {f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
           </select>
         </div>
         <div style={{ flex:1 }}>
@@ -173,7 +174,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
         method: 'POST',
         body: JSON.stringify({ imageId: image.id, ...form }),
       });
-      setMsg('✓ Labelled and added to training set.');
+      setMsg('Labelled and added to training set.');
       onLabelled(image.id);
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setSubmitting(false); }
@@ -188,7 +189,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
       });
       if (bypass) {
         // Applied directly — done
-        setMsg('✓ AI tagged and added to training set automatically.');
+        setMsg('AI tagged and added to training set automatically.');
         onLabelled(image.id);
       } else {
         // Staged for review — show suggestion tab
@@ -212,7 +213,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
         setSuggestion(null);
         setTab('manual');
       } else {
-        setMsg(`✓ ${action === 'edit' ? 'Edited and accepted' : 'Accepted'} — added to training set.`);
+        setMsg(`${action === 'edit' ? 'Edited and accepted' : 'Accepted'} - added to training set.`);
         onLabelled(image.id);
       }
     } catch (e) { setMsg(`Error: ${e.message}`); }
@@ -247,7 +248,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
               {image.scrape_sources?.name} · {image.width_px}×{image.height_px}px
             </div>
           </div>
-          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#888' }}>✕</button>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#888' }}><FiX /></button>
         </div>
 
         {/* Image */}
@@ -257,7 +258,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
         <div style={{ padding:'20px 24px' }}>
           <a href={image.source_url} target="_blank" rel="noopener noreferrer"
             style={{ fontSize:11, color:'#7a1c1c', textDecoration:'none' }}>
-            ↗ View original source
+            <FiExternalLink style={{ verticalAlign:'middle' }} /> View original source
           </a>
 
           {/* Tabs */}
@@ -266,7 +267,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
             <button style={tabStyle(tab==='ai')} onClick={() => setTab('ai')}>AI Auto-Tag</button>
             {suggestion && (
               <button style={tabStyle(tab==='suggestion')} onClick={() => setTab('suggestion')}>
-                🔔 Review Suggestion
+                Review Suggestion
               </button>
             )}
           </div>
@@ -287,8 +288,8 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
               <div style={{ background:'#f9f5ef', border:'1px solid #e8d5b0', borderRadius:10,
                 padding:'12px 16px', marginBottom:16, fontSize:12, color:'#7a1c1c' }}>
                 {bypass
-                  ? '⚡ Auto-approve mode — tags will be applied directly to the training set.'
-                  : '🔍 Review mode — tags will be staged for your sign-off before entering the dataset.'}
+                  ? 'Auto-approve mode - tags will be applied directly to the training set.'
+                  : 'Review mode - tags will be staged for your sign-off before entering the dataset.'}
                 <div style={{ fontSize:11, color:'#999', marginTop:3 }}>
                   Change mode using the toggle at the top of the page.
                 </div>
@@ -302,7 +303,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
               {aiError && (
                 <div style={{ padding:'10px 14px', borderRadius:8, fontSize:13, marginBottom:14,
                   background:'rgba(220,53,69,0.08)', color:'#dc2626', border:'1px solid rgba(220,53,69,0.2)' }}>
-                  ⚠️ {aiError}
+                  {aiError}
                 </div>
               )}
 
@@ -313,7 +314,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                   borderRadius:8, color:'#E8C97A', fontSize:13, fontWeight:700, cursor:'pointer',
                   opacity:aiLoading?0.6:1, fontFamily:"'Jost',sans-serif", letterSpacing:'0.5px' }}
               >
-                {aiLoading ? '🧠 Analysing…' : bypass ? '🤖 Tag with AI (Auto-approve)' : '🤖 Tag with AI (Review first)'}
+                {aiLoading ? 'Analysing...' : bypass ? 'Tag with AI (Auto-approve)' : 'Tag with AI (Review first)'}
               </button>
               <div style={{ fontSize:11, color:'#999', marginTop:10 }}>
                 Uses Claude Sonnet vision. ~₹0.05–0.15 per image via OpenRouter.
@@ -330,7 +331,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:12 }}>
                   {[
-                    { label:'Function',   value:`${FN_EMOJI[suggestion.suggested_function]??''} ${suggestion.suggested_function}` },
+                    { label:'Function',   value:`[${FN_BADGE[suggestion.suggested_function] ?? '?'}] ${suggestion.suggested_function}` },
                     { label:'Style',      value: suggestion.suggested_style },
                     { label:'Complexity', value:<span style={{color:COMPLEXITY_COLOR[suggestion.suggested_complexity]}}>{suggestion.suggested_complexity}</span> },
                   ].map(item => (
@@ -362,13 +363,13 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                   style={{ flex:1, padding:'10px', background:'#15803d', border:'none', borderRadius:7,
                     color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', opacity:submitting?0.5:1,
                     fontFamily:"'Jost',sans-serif" }}>
-                  ✓ Accept
+                  <FiCheck style={{ verticalAlign:'middle' }} /> Accept
                 </button>
                 <button onClick={() => handleSuggestion('reject')} disabled={submitting}
                   style={{ padding:'10px 16px', background:'#dc2626', border:'none', borderRadius:7,
                     color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', opacity:submitting?0.5:1,
                     fontFamily:"'Jost',sans-serif" }}>
-                  ✕ Reject
+                  <FiX style={{ verticalAlign:'middle' }} /> Reject
                 </button>
               </div>
 
@@ -425,11 +426,29 @@ export default function AdminLabelling() {
   const loadImages = useCallback(async () => {
     setLoading(true);
     try {
-      const status = tab === 'dataset' ? 'labelled' : 'raw';
-      const params = new URLSearchParams({ limit: LIMIT, offset, status });
-      const data   = await apiFetch(`/api/labelling/queue?${params}`);
-      setImages(data.images ?? []);
-      setTotal(data.total ?? 0);
+      if (tab === 'pending') {
+        const params = new URLSearchParams({ limit: LIMIT, offset, status: 'pending' });
+        const data = await apiFetch(`/api/labelling/suggestions?${params}`);
+        const mapped = (data.suggestions ?? []).map(s => ({
+          id: s.scraped_images?.id ?? s.id,
+          source_url: s.scraped_images?.source_url,
+          image_url: s.scraped_images?.image_url,
+          storage_path: s.scraped_images?.storage_path,
+          title: s.scraped_images?.title,
+          status: 'raw',
+          publicUrl: s.publicUrl,
+          scrape_sources: { name: 'AI review queue' },
+          ai_label_suggestions: [s],
+        }));
+        setImages(mapped);
+        setTotal(data.total ?? 0);
+      } else {
+        const status = tab === 'dataset' ? 'labelled' : 'raw';
+        const params = new URLSearchParams({ limit: LIMIT, offset, status });
+        const data   = await apiFetch(`/api/labelling/queue?${params}`);
+        setImages(data.images ?? []);
+        setTotal(data.total ?? 0);
+      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, [tab, offset]);
@@ -462,7 +481,7 @@ export default function AdminLabelling() {
         processed += chunk.length;
       }
 
-      setBatchMsg(`✓ Batch auto-tag started for ${processed} images in ${chunks.length} request${chunks.length > 1 ? 's' : ''}.`);
+      setBatchMsg(`Batch auto-tag started for ${processed} images in ${chunks.length} request${chunks.length > 1 ? 's' : ''}.`);
       setBatchSelected(new Set());
       setBatchMode(false);
       if (bypass) loadImages();
@@ -521,9 +540,9 @@ export default function AdminLabelling() {
 
       setBatchSelected(new Set(ids));
       if (expectedTotal > 0 && ids.size < expectedTotal) {
-        setBatchMsg(`✓ Selected ${ids.size} unique images (expected ${expectedTotal}). You can still tag all selected.`);
+        setBatchMsg(`Selected ${ids.size} unique images (expected ${expectedTotal}). You can still tag all selected.`);
       } else {
-        setBatchMsg(`✓ Selected all available images (${ids.size}).`);
+        setBatchMsg(`Selected all available images (${ids.size}).`);
       }
     } catch (e) {
       setBatchMsg(`Error: ${e.message}`);
@@ -556,7 +575,7 @@ export default function AdminLabelling() {
       <div style={S.topbar}>
         <div>
           <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:'#1a0a0a', margin:0 }}>
-            🏷️ Labelling Queue
+            <FiTag style={{ verticalAlign:'middle', marginRight:8 }} />Labelling Queue
           </h1>
           <p style={{ color:'#888', fontSize:13, margin:'4px 0 0' }}>
             Tag scraped images to build the decor cost prediction dataset.
@@ -569,7 +588,7 @@ export default function AdminLabelling() {
             border:'1px solid #e0d5c5', borderRadius:8, padding:'8px 14px' }}>
             <div style={{ fontSize:12, color:'#555' }}>
               <div style={{ fontWeight:700, color: bypass ? '#7a1c1c' : '#555' }}>
-                {bypass ? '⚡ Auto-approve' : '🔍 Review mode'}
+                {bypass ? 'Auto-approve' : 'Review mode'}
               </div>
               <div style={{ fontSize:10, color:'#aaa' }}>
                 {bypass ? 'AI → dataset directly' : 'AI → sign-off → dataset'}
@@ -592,7 +611,7 @@ export default function AdminLabelling() {
               border:'1px solid #e0d5c5', borderRadius:7, color: batchMode ? '#E8C97A' : '#7a1c1c',
               fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:"'Jost',sans-serif" }}
           >
-            {batchMode ? '✕ Cancel Batch' : '⚡ Batch AI Tag'}
+            {batchMode ? 'Cancel Batch' : 'Batch AI Tag'}
           </button>
         </div>
       </div>
@@ -638,7 +657,7 @@ export default function AdminLabelling() {
                 cursor: batchSelected.size ? 'pointer' : 'default',
                 opacity: batchSelected.size ? 1 : 0.4, fontFamily:"'Jost',sans-serif" }}
             >
-              🤖 Tag {batchSelected.size || ''} Images
+              Tag {batchSelected.size || ''} Images
             </button>
           </div>
         </div>
@@ -647,7 +666,7 @@ export default function AdminLabelling() {
       {/* Tabs */}
       <div style={S.tabs}>
         {[
-          { key:'queue',   label:`Queue (${stats.totalRaw ?? 0})` },
+          { key:'queue',   label:`Queue (${stats.queueCount ?? stats.totalRaw ?? 0})` },
           { key:'pending', label:`Pending Sign-off (${stats.pendingSuggestions ?? 0})` },
           { key:'dataset', label:`Dataset (${stats.totalLabelled ?? 0})` },
         ].map(t => (
@@ -664,7 +683,7 @@ export default function AdminLabelling() {
       ) : images.length === 0 ? (
         <div style={{ textAlign:'center', padding:'48px', color:'#999' }}>
           <div style={{ fontSize:36, marginBottom:12 }}>
-            {tab === 'queue' ? '🎉' : tab === 'pending' ? '✨' : '📂'}
+            <FiSearch />
           </div>
           <div style={{ fontSize:15, fontWeight:600, color:'#333', marginBottom:6 }}>
             {tab === 'queue' ? 'Queue is empty' : tab === 'pending' ? 'No pending sign-offs' : 'No labelled images yet'}
@@ -695,7 +714,7 @@ export default function AdminLabelling() {
                 <div style={{ position:'absolute', top:8, left:8, zIndex:10, background:'#7a1c1c',
                   color:'#fff', borderRadius:'50%', width:22, height:22,
                   display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize:12, fontWeight:700 }}>✓</div>
+                  fontSize:12, fontWeight:700 }}><FiCheck /></div>
               )}
               <ImageCard image={img} onClick={() => {}} selected={!batchMode && selected?.id === img.id} />
             </div>

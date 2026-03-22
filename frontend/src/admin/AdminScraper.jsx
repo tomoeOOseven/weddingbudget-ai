@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getToken } from '../lib/tokenStore.js';
 import { fetchFromApi } from '../lib/apiBase.js';
+import { FiCheck, FiLoader, FiTool, FiX } from 'react-icons/fi';
 
 async function apiFetch(path, opts = {}) {
   const token = getToken();
@@ -50,7 +51,7 @@ function JobLogModal({ jobId, onClose }) {
           <div style={{ color:'#E8C97A', fontWeight:700 }}>
             Job Log {job && <StatusBadge status={job.status} />}
           </div>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'#888', fontSize:18, cursor:'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#888', fontSize:18, cursor:'pointer' }}><FiX /></button>
         </div>
         {loading ? (
           <div style={{ padding:'24px', color:'#888', textAlign:'center' }}>Loading…</div>
@@ -64,7 +65,7 @@ function JobLogModal({ jobId, onClose }) {
             </div>
             <div ref={logRef} style={{ flex:1, overflow:'auto', padding:'16px 20px', fontFamily:'monospace', fontSize:11, color:'#a3e635', lineHeight:1.7, background:'#0a0a0a' }}>
               {(job.log ?? []).map((line, i) => <div key={i}>{line}</div>)}
-              {job.status === 'running' && <div style={{ color:'#f59e0b' }}>⟳ Running…</div>}
+              {job.status === 'running' && <div style={{ color:'#f59e0b' }}><FiLoader style={{ verticalAlign:'middle' }} /> Running...</div>}
               {job.error_message && <div style={{ color:'#ef4444', marginTop:8 }}>ERROR: {job.error_message}</div>}
             </div>
           </>
@@ -144,7 +145,7 @@ export default function AdminScraper() {
     setMsg('');
     try {
       const data = await apiFetch('/api/scraper/run', { method:'POST', body: JSON.stringify({ sourceId }) });
-      setMsg(`✓ Scrape started for ${sourceName}`);
+      setMsg(`Scrape started for ${sourceName}`);
       setTimeout(load, 1000);
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setRunning(r => ({ ...r, [sourceId]: false })); }
@@ -155,7 +156,7 @@ export default function AdminScraper() {
     setMsg('');
     try {
       await apiFetch('/api/scraper/run', { method:'POST', body: JSON.stringify({ all: true }) });
-      setMsg('✓ All-source scrape started in background');
+      setMsg('All-source scrape started in background');
       setTimeout(load, 1000);
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setRunning(r => ({ ...r, __ALL__: false })); }
@@ -171,7 +172,7 @@ export default function AdminScraper() {
       const res = await apiFetch('/api/scraper/sources', { method:'POST', body: JSON.stringify(data) });
       setSources(s => [...s, res.source]);
       setShowAdd(false);
-      setMsg(`✓ "${data.name}" added`);
+      setMsg(`"${data.name}" added`);
     } catch (e) { setMsg(`Error: ${e.message}`); }
   }
 
@@ -190,7 +191,7 @@ export default function AdminScraper() {
 
   return (
     <div style={{ fontFamily:"'Jost',sans-serif" }}>
-      <h1 style={S.title}>🕷️ Scraper Control</h1>
+      <h1 style={S.title}><FiTool style={{ verticalAlign:'middle', marginRight:8 }} />Scraper Control</h1>
       <p style={S.sub}>Manage tracked sites, trigger scrape runs, and monitor job logs.</p>
 
       {/* Stats */}
@@ -213,11 +214,11 @@ export default function AdminScraper() {
       <div style={{ display:'flex', gap:10, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
         <button onClick={runAll} disabled={running.__ALL__}
           style={{ padding:'10px 20px', background: running.__ALL__ ? '#eee' : '#1a0a0a', border:'none', borderRadius:8, color: running.__ALL__ ? '#aaa' : '#E8C97A', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-          {running.__ALL__ ? '⟳ Running All…' : '🚀 Run All Sources'}
+          {running.__ALL__ ? 'Running All...' : 'Run All Sources'}
         </button>
         <button onClick={() => setShowAdd(!showAdd)}
           style={{ padding:'10px 16px', background:'transparent', border:'1px solid #e0d5c5', borderRadius:8, color:'#7a1c1c', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-          {showAdd ? '✕ Cancel' : '+ Add Source'}
+          {showAdd ? 'Cancel' : '+ Add Source'}
         </button>
         {msg && <span style={{ fontSize:12, color: msg.startsWith('Error')?'#dc2626':'#15803d' }}>{msg}</span>}
       </div>
@@ -256,7 +257,7 @@ export default function AdminScraper() {
                 <td style={S.td}>
                   <button onClick={() => runScrape(src.id, src.name)} disabled={!src.is_active || running[src.id] || src.isRunning}
                     style={S.runBtn(!src.is_active || running[src.id] || src.isRunning)}>
-                    {running[src.id] || src.isRunning ? '⟳ Running' : 'Run'}
+                    {running[src.id] || src.isRunning ? 'Running' : 'Run'}
                   </button>
                 </td>
               </tr>

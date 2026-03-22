@@ -1,6 +1,7 @@
 // components/ui.jsx — shared primitive components
 
 import React from 'react';
+import { FiCheck } from 'react-icons/fi';
 
 export const fmt = (n) => {
   if (!n || n < 0) return '₹0';
@@ -41,7 +42,7 @@ export function Chip({ on, onClick, children, style = {} }) {
       transition:'all 0.15s', ...style,
     }}>
       {children}
-      {on && <span style={{ marginLeft:'auto', color:'var(--gold)' }}>✓</span>}
+      {on && <span style={{ marginLeft:'auto', color:'var(--gold)' }}><FiCheck /></span>}
     </div>
   );
 }

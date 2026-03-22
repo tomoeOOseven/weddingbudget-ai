@@ -16,6 +16,10 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /api/weddings — create a new wedding
 router.post('/', requireAuth, async (req, res) => {
+  if (req.profile.role !== 'client') {
+    return res.status(403).json({ error: 'Only client accounts can create weddings.' });
+  }
+
   const { name, weddingDate, citySlug, hotelTierSlug, roomsBlocked, totalGuests, outstationPct, brideHometown, groomHometown, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required.' });
 
@@ -64,6 +68,18 @@ router.put('/:id', requireAuth, async (req, res) => {
   const { data, error } = await supabaseAdmin.from('weddings').update(updates).eq('id', req.params.id).eq('client_id', req.profile.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ wedding: data });
+});
+
+// DELETE /api/weddings/:id
+router.delete('/:id', requireAuth, async (req, res) => {
+  const { error } = await supabaseAdmin
+    .from('weddings')
+    .delete()
+    .eq('id', req.params.id)
+    .eq('client_id', req.profile.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ message: 'Wedding deleted.' });
 });
 
 module.exports = router;

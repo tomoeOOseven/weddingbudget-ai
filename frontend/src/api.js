@@ -38,6 +38,7 @@ export const fetchWeddings       = () => request('/api/weddings');
 export const createWedding       = (data) => request('/api/weddings', { method:'POST', body: JSON.stringify(data) });
 export const fetchWedding        = (id) => request(`/api/weddings/${id}`);
 export const updateWedding       = (id, data) => request(`/api/weddings/${id}`, { method:'PUT', body: JSON.stringify(data) });
+export const deleteWedding       = (id) => request(`/api/weddings/${id}`, { method:'DELETE' });
 export const fetchActuals        = (wid) => request(`/api/report/actuals/${wid}`);
 export const addActual           = (data) => request('/api/report/actuals', { method:'POST', body: JSON.stringify(data) });
 export const updateActual        = (id, data) => request(`/api/report/actuals/${id}`, { method:'PUT', body: JSON.stringify(data) });
@@ -52,8 +53,13 @@ export const downloadPDF = async (payload) => {
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error('PDF generation failed');
-  return res.blob();
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'PDF generation failed' }));
+    throw new Error(err.error || 'PDF generation failed');
+  }
+  const contentType = res.headers.get('content-type') || '';
+  const blob = await res.blob();
+  return { blob, contentType };
 };
 
 export const downloadXLSX = async (payload) => {

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Label, SubText, FilterPills, fmt } from './ui.jsx';
 import { scoreDecor } from '../api.js';
+import { FiActivity, FiCheck, FiImage } from 'react-icons/fi';
 
 export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
   const [dFilter, setDFilter] = useState('All');
@@ -100,10 +101,10 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
               {d.imageUrl ? (
                 <div style={{ height:120, overflow:'hidden', background:'#f5f0eb' }}>
                   <img src={d.imageUrl} alt={d.label} style={{ width:'100%', height:'100%', objectFit:'cover' }}
-                    onError={e => { e.target.parentElement.innerHTML = `<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f5f0eb">🌸</div>`; }} />
+                    onError={e => { e.target.parentElement.innerHTML = `<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f5f0eb">IMG</div>`; }} />
                 </div>
               ) : (
-                <div style={{ height:80, display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, background:'#f9f5ef' }}>🌸</div>
+                <div style={{ height:80, display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, background:'#f9f5ef' }}><FiImage /></div>
               )}
 
               <div style={{ padding:'10px 12px' }}>
@@ -117,11 +118,11 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
                   {fmt(min)} – {fmt(max)}
                 </div>
                 {isML && confidence && (
-                  <div style={{ fontSize:9, color:'#15803d', marginTop:2 }}>🧠 ML · {Math.round(confidence*100)}% conf.</div>
+                  <div style={{ fontSize:9, color:'#15803d', marginTop:2 }}><FiActivity style={{ verticalAlign:'middle' }} /> ML · {Math.round(confidence*100)}% conf.</div>
                 )}
               </div>
 
-              {on && <div style={{ position:'absolute', top:8, right:8, background:'var(--gold)', color:'#fff', borderRadius:'50%', width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}>✓</div>}
+              {on && <div style={{ position:'absolute', top:8, right:8, background:'var(--gold)', color:'#fff', borderRadius:'50%', width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}><FiCheck /></div>}
             </div>
           );
         })}
@@ -137,7 +138,7 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
         <Card style={{ background:'#FBF0DC', border:'1px solid var(--gold)', marginTop:16 }}>
           <div style={{ fontWeight:600, fontSize:13, color:'var(--maroon)', marginBottom:10 }}>
             {inputs.selectedDecors.size} design{inputs.selectedDecors.size > 1 ? 's' : ''} selected
-            {scoring && <span style={{ fontSize:11, color:'var(--muted)', marginLeft:8 }}>🧠 Getting ML estimates…</span>}
+            {scoring && <span style={{ fontSize:11, color:'var(--muted)', marginLeft:8 }}><FiActivity style={{ verticalAlign:'middle' }} /> Getting ML estimates...</span>}
           </div>
           {[...inputs.selectedDecors].map(dId => {
             const d = decors.find(x => x.id === dId);
@@ -145,7 +146,7 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
             const { min, max, isML } = getCostRange(d);
             return (
               <div key={dId} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
-                <span>{d.label} {isML && <span style={{ fontSize:10, color:'#15803d' }}>🧠</span>}</span>
+                <span>{d.label} {isML && <span style={{ fontSize:10, color:'#15803d' }}><FiActivity style={{ verticalAlign:'middle' }} /></span>}</span>
                 <span style={{ color:'var(--maroon)', fontWeight:600 }}>{fmt(min)} – {fmt(max)}</span>
               </div>
             );

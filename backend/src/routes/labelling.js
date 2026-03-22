@@ -432,7 +432,9 @@ router.get('/stats', requireAdmin, async (req, res) => {
     supabaseAdmin.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'rejected'),
   ]);
 
-  res.json({ totalRaw, totalLabelled, inTraining, pendingSuggestions, totalRejected });
+  const queueCount = Math.max((totalRaw ?? 0) - (pendingSuggestions ?? 0), 0);
+
+  res.json({ totalRaw, queueCount, totalLabelled, inTraining, pendingSuggestions, totalRejected });
 });
 
 module.exports = router;

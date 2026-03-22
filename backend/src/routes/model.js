@@ -43,7 +43,7 @@ router.post('/promote/:id', requireAdmin, async (req, res) => {
   if (!version) return res.status(404).json({ error: 'Version not found.' });
   if (version.status !== 'ready') return res.status(400).json({ error: 'Can only promote ready versions.' });
 
-  // Deactivate current active
+  // Deactivate all other active versions first.
   const { error: deactivateErr } = await supabaseAdmin.from('model_versions').update({ is_active: false }).eq('is_active', true);
   if (deactivateErr) return res.status(500).json({ error: deactivateErr.message });
 
@@ -52,7 +52,14 @@ router.post('/promote/:id', requireAdmin, async (req, res) => {
     .from('model_versions').update({ is_active: true }).eq('id', req.params.id).select().single();
   if (promoteErr) return res.status(500).json({ error: promoteErr.message });
 
-  res.json({ version: data, message: `Version ${data.version_label} is now active.` });
+  const { data: versions, error: listErr } = await supabaseAdmin
+    .from('model_versions')
+    .select('id, version_label, status, training_set_size, mae_min, mae_max, r2_min, r2_max, trained_at, is_active')
+    .order('trained_at', { ascending: false })
+    .limit(10);
+  if (listErr) return res.status(500).json({ error: listErr.message });
+
+  res.json({ version: data, versions: versions ?? [], message: `Version ${data.version_label} is now active.` });
 });
 
 // GET /api/model/run/:id — training run log

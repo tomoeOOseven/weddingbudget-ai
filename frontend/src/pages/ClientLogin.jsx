@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { FiAlertTriangle, FiCheck } from 'react-icons/fi';
 
 const S = {
   page: { minHeight:'100vh', background:'var(--cream)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Jost',sans-serif", padding:20 },
@@ -88,8 +89,8 @@ export default function ClientLogin() {
           <button style={S.tab(mode==='signup')} onClick={() => { setMode('signup'); setError(''); setOk(''); }}>Create Account</button>
         </div>
 
-        {error && <div style={S.err}>⚠️ {error}</div>}
-        {ok    && <div style={S.ok}>✓ {ok}</div>}
+        {error && <div style={S.err}><FiAlertTriangle style={{ verticalAlign:'middle', marginRight:6 }} /> {error}</div>}
+        {ok    && <div style={S.ok}><FiCheck style={{ verticalAlign:'middle', marginRight:6 }} /> {ok}</div>}
 
         <form onSubmit={handleSubmit}>
           {mode === 'signup' && (

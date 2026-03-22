@@ -1,6 +1,7 @@
 // components/LiveTicker.jsx
 import React from 'react';
 import { fmt } from './ui.jsx';
+import { FiCheck } from 'react-icons/fi';
 
 const STEP_LABELS = ['Event Details','Décor Library','Artists','Food & Beverage','Logistics','Sundries','Budget Report'];
 
@@ -48,7 +49,7 @@ export function StepNav({ step, setStep }) {
               borderBottom: active ? '2px solid var(--gold)' : '2px solid transparent',
               cursor:'pointer', whiteSpace:'nowrap', transition:'all 0.2s',
             }}>
-              {done ? '✓ ' : ''}{label}
+              {done ? <FiCheck style={{ verticalAlign:'middle' }} /> : null} {label}
             </button>
           );
         })}

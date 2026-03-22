@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getToken } from '../lib/tokenStore.js';
 import { fetchFromApi } from '../lib/apiBase.js';
+import { FiActivity, FiAlertTriangle } from 'react-icons/fi';
 
 async function apiFetch(path, opts = {}) {
   const token = getToken();
@@ -49,6 +50,7 @@ export default function AdminModel() {
   const [loading, setLoading]       = useState(true);
   const [versionLabel, setVersionLabel] = useState('');
   const [training, setTraining]     = useState(false);
+  const [promotingId, setPromotingId] = useState(null);
   const [trainMsg, setTrainMsg]     = useState('');
   const [pollInterval, setPollInterval] = useState(null);
 
@@ -93,7 +95,7 @@ export default function AdminModel() {
         method: 'POST',
         body: JSON.stringify({ versionLabel: versionLabel.trim() }),
       });
-      setTrainMsg(`✓ Training started — ${data.message}`);
+      setTrainMsg(`Training started - ${data.message}`);
       setVersionLabel('');
       setTimeout(loadData, 1000);
     } catch (e) { setTrainMsg(`Error: ${e.message}`); }
@@ -101,10 +103,20 @@ export default function AdminModel() {
   }
 
   async function handlePromote(versionId) {
+    setPromotingId(versionId);
     try {
-      await apiFetch(`/api/model/promote/${versionId}`, { method: 'POST' });
-      loadData();
+      const data = await apiFetch(`/api/model/promote/${versionId}`, { method: 'POST' });
+      if (Array.isArray(data?.versions) && data.versions.length) {
+        setVersions(data.versions);
+      } else {
+        setVersions((prev) => prev.map(v => ({
+          ...v,
+          is_active: v.id === versionId,
+        })));
+      }
+      await loadData();
     } catch (e) { alert(e.message); }
+    finally { setPromotingId(null); }
   }
 
   const activeVersion = versions.find(v => v.is_active);
@@ -126,7 +138,7 @@ export default function AdminModel() {
 
   return (
     <div style={{ fontFamily:"'Jost',sans-serif" }}>
-      <h1 style={S.title}>🧠 Model Training</h1>
+      <h1 style={S.title}><FiActivity style={{ verticalAlign: 'middle', marginRight: 8 }} />Model Training</h1>
       <p style={S.sub}>Train, evaluate, and promote cost prediction models.</p>
 
       {/* ML Service health */}
@@ -143,8 +155,8 @@ export default function AdminModel() {
           </strong>
           {mlHealth?.available && (
             <span style={{ color:'#888', marginLeft:12 }}>
-              CLIP {mlHealth.clip_available ? '✓ loaded' : '✗ not available'} ·
-              Model in memory: {mlHealth.model_loaded ? '✓' : '✗'}
+              CLIP {mlHealth.clip_available ? 'loaded' : 'not available'} ·
+              Model in memory: {mlHealth.model_loaded ? 'loaded' : 'not loaded'}
             </span>
           )}
           {!mlHealth?.available && mlHealth?.warming_up && !statusError && (
@@ -225,7 +237,7 @@ export default function AdminModel() {
             disabled={training || !versionLabel.trim() || (trainingStats?.inTraining ?? 0) < 20}
             onClick={handleTrain}
           >
-            {training ? 'Starting…' : '🚀 Train'}
+            {training ? 'Starting…' : 'Train'}
           </button>
         </div>
         {trainMsg && (
@@ -235,7 +247,7 @@ export default function AdminModel() {
         )}
         {(trainingStats?.inTraining ?? 0) < 20 && (
           <div style={{ marginTop:10, fontSize:12, color:'#dc2626' }}>
-            ⚠️ Need at least 20 images in the training set. Currently have {trainingStats?.inTraining ?? 0}.
+            <FiAlertTriangle style={{ verticalAlign: 'middle' }} /> Need at least 20 images in the training set. Currently have {trainingStats?.inTraining ?? 0}.
           </div>
         )}
       </div>
@@ -282,7 +294,7 @@ export default function AdminModel() {
                           style={{ padding:'5px 12px', background:'#f5f0eb', border:'1px solid #e0d5c5',
                             borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', color:'#7a1c1c',
                             fontFamily:"'Jost',sans-serif" }}>
-                          Promote
+                          {promotingId === v.id ? 'Promoting...' : 'Promote'}
                         </button>
                       )}
                     </td>

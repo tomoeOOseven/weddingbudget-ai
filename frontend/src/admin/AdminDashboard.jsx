@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { FiActivity, FiClock, FiImage, FiMic, FiRefreshCw, FiTag, FiTool, FiUserCheck } from 'react-icons/fi';
 
 function StatCard({ icon, label, value, sub, onClick, color = '#7a1c1c' }) {
   return (
@@ -16,7 +17,7 @@ function StatCard({ icon, label, value, sub, onClick, color = '#7a1c1c' }) {
       onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
     >
       <div style={{ fontSize: 26, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontSize: 28, fontWeight: 700, color, fontFamily: "'Cormorant Garamond', serif" }}>
+      <div style={{ fontSize: 28, fontWeight: 700, color, fontFamily: "'Cormorant Garamond', serif", overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
         {value ?? '—'}
       </div>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginTop: 2 }}>{label}</div>
@@ -75,7 +76,7 @@ export default function AdminDashboard() {
           supabase.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'labelled'),
           supabase.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'raw'),
           supabase.from('artists').select('*', { count: 'exact', head: true }),
-          supabase.from('model_versions').select('version_label, r2_min, trained_at').eq('is_active', true).limit(1),
+          supabase.from('model_versions').select('version_label, r2_min, r2_max, training_set_size, trained_at').eq('is_active', true).limit(1),
           supabase.from('scrape_jobs').select('id, status, images_saved, created_at, scrape_sources(name)')
             .order('created_at', { ascending: false }).limit(5),
         ]);
@@ -102,7 +103,7 @@ export default function AdminDashboard() {
       {/* Greeting */}
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 30, color: '#1a0a0a', margin: 0 }}>
-          {greeting}, {firstName} 👋
+          {greeting}, {firstName} <FiUserCheck style={{ verticalAlign: 'middle' }} />
         </h1>
         <p style={{ color: '#888', fontSize: 13, margin: '6px 0 0' }}>
           Here's the current state of WeddingBudget.ai's data pipeline.
@@ -111,10 +112,10 @@ export default function AdminDashboard() {
 
       {/* Stats row */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 28 }}>
-        <StatCard icon="🖼️" label="Total Scraped Images" value={loading ? '…' : stats.totalImages?.toLocaleString()} sub="across all sources" onClick={() => navigate('/admin/scraper')} />
-        <StatCard icon="🏷️" label="Labelled Images" value={loading ? '…' : stats.labelledImages?.toLocaleString()} sub="ready for training" color="#15803d" onClick={() => navigate('/admin/labelling')} />
-        <StatCard icon="⏳" label="Pending Labels" value={loading ? '…' : stats.pendingLabels?.toLocaleString()} sub="awaiting review" color="#b45309" onClick={() => navigate('/admin/labelling')} />
-        <StatCard icon="🧠" label="Active Model" value={loading ? '…' : (stats.activeModel?.version_label ?? 'None')} sub={stats.activeModel ? `R² ${stats.activeModel.r2_min ?? '—'}` : 'No model trained yet'} onClick={() => navigate('/admin/model')} />
+        <StatCard icon={<FiImage />} label="Total Scraped Images" value={loading ? '…' : stats.totalImages?.toLocaleString()} sub="across all sources" onClick={() => navigate('/admin/scraper')} />
+        <StatCard icon={<FiTag />} label="Labelled Images" value={loading ? '…' : stats.labelledImages?.toLocaleString()} sub="ready for training" color="#15803d" onClick={() => navigate('/admin/labelling')} />
+        <StatCard icon={<FiClock />} label="Pending Labels" value={loading ? '…' : stats.pendingLabels?.toLocaleString()} sub="awaiting review" color="#b45309" onClick={() => navigate('/admin/labelling')} />
+        <StatCard icon={<FiActivity />} label="Active Model" value={loading ? '…' : (stats.activeModel?.version_label ?? 'None')} sub={stats.activeModel ? `R² min ${stats.activeModel.r2_min ?? '—'} | R² max ${stats.activeModel.r2_max ?? '—'}` : 'No model trained yet'} onClick={() => navigate('/admin/model')} />
       </div>
 
       {/* Quick actions + recent jobs */}
@@ -125,10 +126,10 @@ export default function AdminDashboard() {
             Quick Actions
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <QuickAction icon="🕷️" label="Run Scraper" desc="Trigger a manual scrape on any tracked site or all sites at once." path="/admin/scraper" />
-            <QuickAction icon="🏷️" label="Label Images" desc="Review untagged images. Use AI auto-tag or label manually." path="/admin/labelling" />
-            <QuickAction icon="🔁" label="Retrain Model" desc="Kick off a new training run with the latest labelled dataset." path="/admin/model" />
-            <QuickAction icon="🎤" label="Update Artist Costs" desc="Edit fee ranges for artists. All changes are version-controlled." path="/admin/artists" />
+            <QuickAction icon={<FiTool />} label="Run Scraper" desc="Trigger a manual scrape on any tracked site or all sites at once." path="/admin/scraper" />
+            <QuickAction icon={<FiTag />} label="Label Images" desc="Review untagged images. Use AI auto-tag or label manually." path="/admin/labelling" />
+            <QuickAction icon={<FiRefreshCw />} label="Retrain Model" desc="Kick off a new training run with the latest labelled dataset." path="/admin/model" />
+            <QuickAction icon={<FiMic />} label="Update Artist Costs" desc="Edit fee ranges for artists. All changes are version-controlled." path="/admin/artists" />
           </div>
         </div>
 
@@ -184,11 +185,11 @@ export default function AdminDashboard() {
             {[
               { label: 'R² Score (cost_min)', value: stats.activeModel.r2_min ?? '—' },
               { label: 'R² Score (cost_max)', value: stats.activeModel.r2_max ?? '—' },
-              { label: 'Training Set', value: `${stats.labelledImages ?? 0} images` },
+              { label: 'Training Set', value: `${stats.activeModel.training_set_size ?? 0} images` },
               { label: 'Trained', value: stats.activeModel.trained_at ? new Date(stats.activeModel.trained_at).toLocaleDateString('en-IN') : '—' },
             ].map(m => (
-              <div key={m.label}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#7a1c1c', fontFamily: "'Cormorant Garamond', serif" }}>{m.value}</div>
+              <div key={m.label} style={{ minWidth: 120, maxWidth: 260 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#7a1c1c', fontFamily: "'Cormorant Garamond', serif", overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{m.value}</div>
                 <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{m.label}</div>
               </div>
             ))}
