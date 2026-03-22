@@ -96,7 +96,7 @@ export default function App() {
 
       {apiError && (
         <div style={{ background:'#FFF3CD', borderBottom:'1px solid #FDEEBA', padding:'8px 28px', fontSize:12, color:'#856404' }}>
-          Backend not detected — running with bundled fallback data.
+          ⚠️ Backend not detected — running with bundled fallback data.
         </div>
       )}
 
@@ -115,7 +115,7 @@ export default function App() {
 function Loader({ text }) {
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', fontFamily:"'Cormorant Garamond',serif", fontSize:24, color:'var(--maroon)' }}>
-      {text}
+      🌸 {text}
     </div>
   );
 }

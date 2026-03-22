@@ -37,7 +37,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="fb"        element={<AdminCostData />} />
           <Route path="logistics" element={<AdminCostData />} />
           <Route path="cities"    element={<AdminCostData />} />
-          <Route path="decor"     element={<AdminPlaceholder title="Decor Library" description="Manage seed decor items. Scraped images are managed via the Labelling Queue." />} />
+          <Route path="decor"     element={<AdminPlaceholder icon="💐" title="Decor Library" description="Manage seed decor items. Scraped images are managed via the Labelling Queue." />} />
           <Route path="audit"     element={<AdminCostData />} />
           <Route path="*"         element={<Navigate to="/admin" replace />} />
         </Route>
