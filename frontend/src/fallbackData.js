@@ -23,12 +23,12 @@ export default {
     farm:   { label:'Farmhouse / Villa', roomRate:6000,  costMult:0.85, decorMult:0.9 },
   },
   functions: [
-    { id:'haldi',     label:'Haldi',     emoji:'💛' },
-    { id:'mehendi',   label:'Mehendi',   emoji:'🌿' },
-    { id:'sangeet',   label:'Sangeet',   emoji:'🎵' },
-    { id:'baraat',    label:'Baraat',    emoji:'🐴' },
-    { id:'pheras',    label:'Pheras',    emoji:'🔥' },
-    { id:'reception', label:'Reception', emoji:'✨' },
+    { id:'haldi',     label:'Haldi' },
+    { id:'mehendi',   label:'Mehendi' },
+    { id:'sangeet',   label:'Sangeet' },
+    { id:'baraat',    label:'Baraat' },
+    { id:'pheras',    label:'Pheras' },
+    { id:'reception', label:'Reception' },
   ],
   decor: [
     { id:'d1',  label:'Grand Floral Mandap',     function:'pheras',    style:'Traditional',  costMin:500000,  costMax:900000  },

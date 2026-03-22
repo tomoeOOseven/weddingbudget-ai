@@ -77,7 +77,7 @@ export default function Step1EventDetails({ inputs, set, toggle, refData, cm, hd
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
           {funs.map(f => (
             <Chip key={f.id} on={inputs.functions.has(f.id)} onClick={() => toggle('functions', f.id)}>
-              <span style={{ fontSize:16 }}>{f.emoji}</span>{f.label}
+              {f.label}
             </Chip>
           ))}
         </div>
