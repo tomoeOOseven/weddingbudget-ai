@@ -1,7 +1,7 @@
 // App.jsx — client-facing wizard with auth + wedding selection
 import React, { useEffect, useState } from 'react';
-import { fetchReferenceData } from './api.js';
-import { useBudget } from './useBudget.js';
+import { fetchReferenceData, fetchWedding, updateWedding } from './api.js';
+import { useBudget, normalizeBudgetInputs, serializeBudgetInputs } from './useBudget.js';
 import { LiveTicker, StepNav, NavBar } from './components/LiveTicker.jsx';
 import Step1EventDetails  from './components/Step1EventDetails.jsx';
 import Step2DecorLibrary  from './components/Step2DecorLibrary.jsx';
@@ -15,6 +15,32 @@ import WeddingDashboard   from './pages/WeddingDashboard.jsx';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { FiAlertTriangle, FiLoader } from 'react-icons/fi';
 
+const ACTIVE_WEDDING_KEY = 'wdtch_active_wedding_id';
+const WEDDING_STATE_PREFIX = 'wdtch_wedding_state_';
+
+function parseWeddingNotes(notes) {
+  if (!notes || typeof notes !== 'string') return null;
+  try {
+    const parsed = JSON.parse(notes);
+    return parsed?.wizardInputs ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getQueryWeddingId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('wid');
+}
+
+function setQueryWeddingId(id) {
+  const params = new URLSearchParams(window.location.search);
+  if (id) params.set('wid', id);
+  else params.delete('wid');
+  const query = params.toString();
+  window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+}
+
 export default function App() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -23,6 +49,8 @@ export default function App() {
   const [apiError, setApiError] = useState(false);
   // Null = show dashboard, object = active wedding (or {} for guest mode)
   const [activeWedding, setActiveWedding] = useState(null);
+  const [hydratingWedding, setHydratingWedding] = useState(false);
+  const [weddingHydrationDone, setWeddingHydrationDone] = useState(false);
 
   useEffect(() => {
     fetchReferenceData()
@@ -36,11 +64,98 @@ export default function App() {
       });
   }, []);
 
-  const { inputs, set, toggle, step, setStep, budget, cm, hd } = useBudget(refData);
+  const { inputs, set, toggle, hydrateInputs, resetInputs, step, setStep, budget, cm, hd } = useBudget(refData);
+
+  useEffect(() => {
+    if (authLoading || !user || isAdmin) {
+      setWeddingHydrationDone(true);
+      return;
+    }
+
+    const rememberedWeddingId = getQueryWeddingId() || localStorage.getItem(ACTIVE_WEDDING_KEY);
+    if (!rememberedWeddingId) {
+      setWeddingHydrationDone(true);
+      return;
+    }
+
+    setHydratingWedding(true);
+    fetchWedding(rememberedWeddingId)
+      .then((wedding) => setActiveWedding(wedding))
+      .catch(() => {
+        localStorage.removeItem(ACTIVE_WEDDING_KEY);
+        setQueryWeddingId(null);
+      })
+      .finally(() => {
+        setHydratingWedding(false);
+        setWeddingHydrationDone(true);
+      });
+  }, [authLoading, user, isAdmin]);
+
+  useEffect(() => {
+    if (!user || !weddingHydrationDone) return;
+
+    const weddingId = activeWedding?.id;
+    if (!weddingId) {
+      localStorage.removeItem(ACTIVE_WEDDING_KEY);
+      setQueryWeddingId(null);
+      if (activeWedding === null) {
+        resetInputs();
+        setStep(1);
+      }
+      return;
+    }
+
+    localStorage.setItem(ACTIVE_WEDDING_KEY, weddingId);
+    setQueryWeddingId(weddingId);
+
+    const noteState = parseWeddingNotes(activeWedding.notes);
+    const localStateRaw = localStorage.getItem(`${WEDDING_STATE_PREFIX}${weddingId}`);
+    let localState = null;
+    if (localStateRaw) {
+      try {
+        localState = JSON.parse(localStateRaw);
+      } catch {
+        localStorage.removeItem(`${WEDDING_STATE_PREFIX}${weddingId}`);
+      }
+    }
+    const merged = normalizeBudgetInputs({
+      ...noteState,
+      ...localState,
+      guests: activeWedding.total_guests ?? noteState?.guests ?? localState?.guests,
+      rooms: activeWedding.rooms_blocked ?? noteState?.rooms ?? localState?.rooms,
+      outstationPct: activeWedding.outstation_pct ?? noteState?.outstationPct ?? localState?.outstationPct,
+    });
+
+    hydrateInputs(merged);
+    setStep(1);
+  }, [user, activeWedding?.id, weddingHydrationDone]);
+
+  useEffect(() => {
+    if (!user || !activeWedding?.id) return;
+
+    const weddingId = activeWedding.id;
+    const payload = serializeBudgetInputs(inputs);
+    localStorage.setItem(`${WEDDING_STATE_PREFIX}${weddingId}`, JSON.stringify(payload));
+
+    const timer = setTimeout(() => {
+      updateWedding(weddingId, {
+        notes: JSON.stringify({ wizardInputs: payload, savedAt: new Date().toISOString() }),
+        total_guests: inputs.guests,
+        rooms_blocked: inputs.rooms,
+        outstation_pct: inputs.outstationPct,
+      }).catch(() => {});
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [user, activeWedding?.id, inputs]);
 
   // Auth loading
   if (authLoading) {
     return <Loader text="WeddingBudget.ai…" />;
+  }
+
+  if (hydratingWedding) {
+    return <Loader text="Restoring your wedding workspace…" />;
   }
 
   if (user && isAdmin) {
@@ -48,7 +163,7 @@ export default function App() {
   }
 
   // Logged in but haven't selected a wedding yet
-  if (user && activeWedding === null) {
+  if (user && activeWedding === null && weddingHydrationDone) {
     return <WeddingDashboard onSelectWedding={(w) => setActiveWedding(w ?? {})} />;
   }
 

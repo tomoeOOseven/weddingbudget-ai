@@ -1,7 +1,7 @@
 // Step7Report.jsx — full report with export, scenarios, and actuals tracker
 import React, { useState, useEffect } from 'react';
 import { BtnPrimary, BtnOutline, CAT_COLORS, fmt } from './ui.jsx';
-import { downloadPDF, downloadXLSX, fetchActuals, addActual, updateActual, deleteActual, fetchScenarios, saveScenario } from '../api.js';
+import { downloadPDF, downloadXLSX, fetchActuals, addActual, updateActual, deleteActual, fetchScenarios, saveScenario, deleteScenario, calculateEstimate } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { FiBarChart2, FiDownload, FiFileText, FiX } from 'react-icons/fi';
 
@@ -54,10 +54,11 @@ function ExportButton({ budget, inputs }) {
 }
 
 // ── Scenario Comparison ───────────────────────────────────────────────────────
-function ScenarioComparison({ weddingId, currentTotal }) {
+function ScenarioComparison({ weddingId, estimateId }) {
   const [scenarios, setScenarios] = useState([]);
   const [saving, setSaving]       = useState(false);
   const [name, setName]           = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     if (weddingId) {
@@ -69,11 +70,29 @@ function ScenarioComparison({ weddingId, currentTotal }) {
     if (!weddingId || !name.trim()) return;
     setSaving(true);
     try {
-      const data = await saveScenario({ weddingId, label: name.trim(), isBaseline: scenarios.length === 0 });
+      const data = await saveScenario({
+        weddingId,
+        label: name.trim(),
+        estimateId: estimateId ?? null,
+        isBaseline: scenarios.length === 0,
+      });
       setScenarios(s => [...s, data.scenario]);
       setName('');
     } catch (e) { alert(e.message); }
     finally { setSaving(false); }
+  }
+
+  async function handleDeleteScenario(id) {
+    if (!confirm('Delete this saved scenario?')) return;
+    setDeletingId(id);
+    try {
+      await deleteScenario(id);
+      setScenarios(list => list.filter((row) => row.id !== id));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   if (!weddingId) return null;
@@ -86,7 +105,16 @@ function ScenarioComparison({ weddingId, currentTotal }) {
       ) : (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:12, marginBottom:14 }}>
           {scenarios.map(s => (
-            <div key={s.id} style={{ background:'var(--cream)', border:'1px solid var(--border)', borderRadius:8, padding:'14px' }}>
+            <div key={s.id} style={{ background:'var(--cream)', border:'1px solid var(--border)', borderRadius:8, padding:'14px', position:'relative' }}>
+              <button
+                type="button"
+                onClick={() => handleDeleteScenario(s.id)}
+                disabled={deletingId === s.id}
+                style={{ position:'absolute', top:6, right:6, background:'transparent', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:14, opacity:deletingId === s.id ? 0.5 : 1 }}
+                title="Delete scenario"
+              >
+                <FiX />
+              </button>
               <div style={{ fontWeight:700, fontSize:13, color:'var(--maroon)', marginBottom:4 }}>{s.label}</div>
               {s.budget_estimates && (
                 <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:16, color:'var(--text)' }}>
@@ -191,7 +219,7 @@ function BudgetTracker({ weddingId, estimatedItems }) {
             </div>
             <div>
               <label style={{ fontSize:10, color:'var(--muted)', fontWeight:600, letterSpacing:'1px', textTransform:'uppercase', display:'block', marginBottom:4 }}>Actual Amount (₹) *</label>
-              <input required type="number" value={form.actual_amount} onChange={e => setForm(f => ({...f, actual_amount: e.target.value}))} style={inputStyle} placeholder="800000" />
+              <input required type="number" step={50000} value={form.actual_amount} onChange={e => setForm(f => ({...f, actual_amount: e.target.value}))} style={inputStyle} placeholder="800000" />
             </div>
             <div>
               <label style={{ fontSize:10, color:'var(--muted)', fontWeight:600, letterSpacing:'1px', textTransform:'uppercase', display:'block', marginBottom:4 }}>Vendor Name</label>
@@ -233,6 +261,27 @@ function BudgetTracker({ weddingId, estimatedItems }) {
 export default function Step7Report({ budget, inputs, setStep, weddingId }) {
   const { items, tMin, tMax, tMid } = budget;
   const { user } = useAuth();
+  const [estimateId, setEstimateId] = useState(null);
+
+  useEffect(() => {
+    if (!user || !weddingId) {
+      setEstimateId(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const data = await calculateEstimate({ ...inputs, weddingId });
+        if (data?.currentEstimateId) {
+          setEstimateId(data.currentEstimateId);
+        }
+      } catch {
+        // Non-blocking: local estimate UI remains usable even if save fails.
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [user, weddingId, inputs]);
 
   return (
     <div>
@@ -314,7 +363,7 @@ export default function Step7Report({ budget, inputs, setStep, weddingId }) {
       </div>
 
       {/* Scenario comparison (logged-in clients only) */}
-      {user && <ScenarioComparison weddingId={weddingId} currentTotal={tMid} />}
+      {user && <ScenarioComparison weddingId={weddingId} estimateId={estimateId} />}
 
       {/* Budget tracker (logged-in clients only) */}
       {user && <BudgetTracker weddingId={weddingId} estimatedItems={items} />}

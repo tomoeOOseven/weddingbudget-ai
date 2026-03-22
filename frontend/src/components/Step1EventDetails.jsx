@@ -64,7 +64,7 @@ export default function Step1EventDetails({ inputs, set, toggle, refData, cm, hd
           </div>
           <div>
             <Label>Total Guests: {inputs.guests}</Label>
-            <input type="range" min={50} max={2000} step={25} value={inputs.guests}
+            <input type="range" min={50} max={2000} step={50} value={inputs.guests}
               onChange={e => set('guests', +e.target.value)} />
           </div>
           <div>

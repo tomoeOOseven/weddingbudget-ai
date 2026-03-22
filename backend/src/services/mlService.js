@@ -6,11 +6,7 @@
 
 const axios = require('axios');
 
-const DEFAULT_PROD_ML_URL = 'https://weddingbudget-ml-service.onrender.com';
-const ML_URL = process.env.ML_SERVICE_URL
-  ?? (process.env.NODE_ENV === 'production'
-    ? DEFAULT_PROD_ML_URL
-    : 'http://localhost:8000');
+const ML_URL = String(process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
 const TIMEOUT = 30000;
 const TRANSIENT_STATUS_CODES = new Set([429, 502, 503, 504]);
 
@@ -138,29 +134,19 @@ async function getModelStatus() {
  */
 async function checkHealth() {
   const primary = trimTrailingSlash(ML_URL);
-  const fallback = trimTrailingSlash(DEFAULT_PROD_ML_URL);
-  const candidates = [
-    primary,
-    ...(primary === fallback ? [] : [fallback]),
-  ];
+  const probe = await probeHealth(primary, 3);
 
-  let lastProbe = null;
-
-  for (const base of candidates) {
-    const probe = await probeHealth(base, 3);
-    if (probe.ok) {
-      return { available: true, checked_url: base, ...probe.data };
-    }
-    lastProbe = { ...probe, base };
+  if (probe.ok) {
+    return { available: true, checked_url: primary, ...probe.data };
   }
 
-  const statusCode = lastProbe?.statusCode ?? null;
+  const statusCode = probe?.statusCode ?? null;
   return {
     available: false,
     checked_url: primary,
     status_code: statusCode,
-    warming_up: lastProbe?.transient ?? false,
-    error: lastProbe?.error?.message || 'Health check failed',
+    warming_up: probe?.transient ?? false,
+    error: probe?.error?.message || 'Health check failed',
   };
 }
 

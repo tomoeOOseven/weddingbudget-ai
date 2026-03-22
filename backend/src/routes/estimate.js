@@ -50,6 +50,7 @@ router.post('/', async (req, res) => {
   try {
     const refData = await getRefData();
     const result  = calculateBudget(req.body, refData);
+    let currentEstimateId = null;
 
     // If decor items selected, try ML inference for better estimates
     const arrDecors = Array.isArray(req.body.selectedDecors) ? req.body.selectedDecors : [...(req.body.selectedDecors ?? [])];
@@ -73,21 +74,31 @@ router.post('/', async (req, res) => {
     if (token && req.body.weddingId) {
       const { data: { user } } = await supabase.auth.getUser(token);
       if (user) {
+        const { data: wedding } = await supabase
+          .from('weddings')
+          .select('id')
+          .eq('id', req.body.weddingId)
+          .eq('client_id', user.id)
+          .single();
+
+        if (wedding) {
         // Deactivate previous estimates for this wedding
-        await supabase.from('budget_estimates').update({ is_current: false }).eq('wedding_id', req.body.weddingId).eq('is_current', true);
-        await supabase.from('budget_estimates').insert({
-          wedding_id:   req.body.weddingId,
-          total_min:    result.summary.conservative,
-          total_max:    result.summary.luxury,
-          total_mid:    result.summary.expected,
-          line_items:   result.items,
-          generated_by: user.id,
-          is_current:   true,
-        });
+          await supabase.from('budget_estimates').update({ is_current: false }).eq('wedding_id', req.body.weddingId).eq('is_current', true);
+          const { data: insertedEstimate } = await supabase.from('budget_estimates').insert({
+            wedding_id:   req.body.weddingId,
+            total_min:    result.summary.conservative,
+            total_max:    result.summary.luxury,
+            total_mid:    result.summary.expected,
+            line_items:   result.items,
+            generated_by: user.id,
+            is_current:   true,
+          }).select('id').single();
+          currentEstimateId = insertedEstimate?.id ?? null;
+        }
       }
     }
 
-    res.json({ id: uuidv4(), ...result, calculatedAt: new Date().toISOString() });
+    res.json({ id: uuidv4(), ...result, currentEstimateId, calculatedAt: new Date().toISOString() });
   } catch (err) {
     console.error('[estimate]', err.message);
     res.status(500).json({ error: err.message });

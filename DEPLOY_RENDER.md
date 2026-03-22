@@ -1,12 +1,12 @@
-# Deploy (Frontend on Vercel, Backend + ML on Render)
+# Deploy (Frontend on Vercel, Backend on Render)
 
-This setup deploys frontend on Vercel and backend + ML service on Render.
+This setup deploys frontend on Vercel and a single backend service on Render.
+The backend starts the ML service internally, so no second deployment is required.
 Render uses the root `render.yaml` blueprint.
 
 ## Services
 
-- `weddingbudget-backend` (Node/Express, from `backend`)
-- `weddingbudget-ml-service` (FastAPI, from `ml_service`)
+- `weddingbudget-backend` (Node/Express + embedded ML, from `backend`)
 
 ## Frontend (Vercel)
 
@@ -26,11 +26,7 @@ Render uses the root `render.yaml` blueprint.
 2. In Render, click `New` -> `Blueprint`.
 3. Select this repository and branch.
 4. Render will detect `render.yaml` and create both services.
-5. In `weddingbudget-ml-service`, set required env vars:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-6. Deploy the ML service first and copy its URL.
-7. In `weddingbudget-backend`, set required env vars:
+5. In `weddingbudget-backend`, set required env vars:
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -42,18 +38,18 @@ Render uses the root `render.yaml` blueprint.
    - `OPENROUTER_FOURTH_FALLBACK_MODEL` (optional)
    - `OPENROUTER_FIFTH_FALLBACK_MODEL` (optional)
    - `FRONTEND_URL` (your deployed Vercel frontend URL)
-   - `ML_SERVICE_URL` = `https://weddingbudget-ml-service.onrender.com`
-8. Redeploy backend after setting `ML_SERVICE_URL`.
-9. Verify backend CORS works by opening the Vercel app and testing one API call.
+   - `EMBEDDED_ML_SERVICE=1`
+   - `ML_SERVICE_URL=http://127.0.0.1:8000`
+6. Deploy backend and verify CORS works by opening the Vercel app and testing one API call.
 
 ## Health Checks
 
 - Backend: `GET /health`
-- ML service: `GET /health`
+- Embedded ML service: `GET /api/model/status` (backend checks internal health)
 
 ## Notes
 
 - Backend scraper uses Playwright. The Render backend build installs Chromium (`npx playwright install chromium`) and sets `PLAYWRIGHT_BROWSERS_PATH=0`.
-- `ml_service` runs CPU-only on Render starter/free plans.
-- The ML service build installs CPU Torch + CLIP so visual embeddings are available in production.
+- Embedded ML runs CPU-only on Render starter/free plans.
+- Backend build installs ML Python dependencies (CPU Torch + CLIP) so visual embeddings are available in production.
 - If you use free plans, cold starts can delay first request.

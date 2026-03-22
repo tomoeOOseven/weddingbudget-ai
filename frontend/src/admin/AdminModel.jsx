@@ -16,6 +16,21 @@ async function apiFetch(path, opts = {}) {
   return res.json();
 }
 
+function normalizeVersions(list = []) {
+  const sorted = [...list].sort((a, b) => {
+    const aTs = a?.trained_at ? new Date(a.trained_at).getTime() : 0;
+    const bTs = b?.trained_at ? new Date(b.trained_at).getTime() : 0;
+    return bTs - aTs;
+  });
+
+  let activeSeen = false;
+  return sorted.map((version) => {
+    const normalizedActive = Boolean(version.is_active) && !activeSeen;
+    if (normalizedActive) activeSeen = true;
+    return { ...version, is_active: normalizedActive };
+  });
+}
+
 function MetricCard({ label, value, sub, color = '#7a1c1c' }) {
   return (
     <div style={{ background:'#fff', border:'1px solid rgba(0,0,0,0.07)', borderRadius:10, padding:'18px 20px', flex:1, minWidth:130 }}>
@@ -60,7 +75,7 @@ export default function AdminModel() {
         apiFetch('/api/model/status'),
         apiFetch('/api/labelling/stats'),
       ]);
-      setVersions(statusData.versions ?? []);
+      setVersions(normalizeVersions(statusData.versions ?? []));
       setMlHealth(statusData.mlHealth);
       setTrainingStats(statsData);
       setStatusError('');
@@ -107,12 +122,12 @@ export default function AdminModel() {
     try {
       const data = await apiFetch(`/api/model/promote/${versionId}`, { method: 'POST' });
       if (Array.isArray(data?.versions) && data.versions.length) {
-        setVersions(data.versions);
+        setVersions(normalizeVersions(data.versions));
       } else {
-        setVersions((prev) => prev.map(v => ({
+        setVersions((prev) => normalizeVersions(prev.map(v => ({
           ...v,
           is_active: v.id === versionId,
-        })));
+        }))));
       }
       await loadData();
     } catch (e) { alert(e.message); }

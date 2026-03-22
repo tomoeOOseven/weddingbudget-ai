@@ -5,6 +5,25 @@ const router  = express.Router();
 const { requireAuth, supabaseAdmin } = require('../middleware/authMiddleware');
 const { generateBudgetXLSX } = require('../services/excelService');
 
+async function ensureWeddingAccess(weddingId, profile) {
+  const { data: wedding, error } = await supabaseAdmin
+    .from('weddings')
+    .select('id, client_id')
+    .eq('id', weddingId)
+    .single();
+
+  if (error || !wedding) {
+    return { ok: false, status: 404, error: 'Wedding not found.' };
+  }
+
+  const isAdmin = profile.role === 'admin' || profile.role === 'super_admin';
+  if (!isAdmin && wedding.client_id !== profile.id) {
+    return { ok: false, status: 403, error: 'Not authorised for this wedding.' };
+  }
+
+  return { ok: true, wedding };
+}
+
 // ── XLSX Export ────────────────────────────────────────────────────────────
 // POST /api/report/xlsx
 router.post('/xlsx', requireAuth, async (req, res) => {
@@ -85,6 +104,9 @@ router.post('/pdf', requireAuth, async (req, res) => {
 // ── Budget Actuals (tracker) ───────────────────────────────────────────────
 // GET /api/report/actuals/:weddingId
 router.get('/actuals/:weddingId', requireAuth, async (req, res) => {
+  const access = await ensureWeddingAccess(req.params.weddingId, req.profile);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+
   const { data, error } = await supabaseAdmin
     .from('budget_actuals')
     .select('*')
@@ -98,6 +120,9 @@ router.get('/actuals/:weddingId', requireAuth, async (req, res) => {
 router.post('/actuals', requireAuth, async (req, res) => {
   const { weddingId, estimateId, cost_head, line_item_label, estimated_min, estimated_max, actual_amount, vendor_name, invoice_reference, paid_date, notes } = req.body;
   if (!weddingId || !cost_head || !line_item_label) return res.status(400).json({ error: 'weddingId, cost_head, line_item_label required.' });
+
+  const access = await ensureWeddingAccess(weddingId, req.profile);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
 
   const { data, error } = await supabaseAdmin.from('budget_actuals').insert({
     wedding_id: weddingId, estimate_id: estimateId ?? null, cost_head, line_item_label,
@@ -153,19 +178,68 @@ router.delete('/actuals/:id', requireAuth, async (req, res) => {
 
 // GET /api/report/scenarios/:weddingId
 router.get('/scenarios/:weddingId', requireAuth, async (req, res) => {
-  const { data } = await supabaseAdmin.from('scenarios').select(`*, budget_estimates ( total_min, total_max, total_mid, line_items ), cities ( label ), hotel_tiers ( label )`).eq('wedding_id', req.params.weddingId);
+  const access = await ensureWeddingAccess(req.params.weddingId, req.profile);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+
+  const { data, error } = await supabaseAdmin
+    .from('scenarios')
+    .select(`*, budget_estimates ( id, total_min, total_max, total_mid, line_items ), cities ( label ), hotel_tiers ( label )`)
+    .eq('wedding_id', req.params.weddingId)
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ scenarios: data ?? [] });
 });
 
 // POST /api/report/scenarios — save a scenario
 router.post('/scenarios', requireAuth, async (req, res) => {
   const { weddingId, label, cityId, hotelTierId, estimateId, isBaseline = false, notes } = req.body;
+  if (!weddingId || !label?.trim()) return res.status(400).json({ error: 'weddingId and label are required.' });
+
+  const access = await ensureWeddingAccess(weddingId, req.profile);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+
+  let resolvedEstimateId = estimateId ?? null;
+  if (!resolvedEstimateId) {
+    const { data: currentEstimate } = await supabaseAdmin
+      .from('budget_estimates')
+      .select('id')
+      .eq('wedding_id', weddingId)
+      .eq('is_current', true)
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    resolvedEstimateId = currentEstimate?.id ?? null;
+  }
+
   const { data, error } = await supabaseAdmin.from('scenarios').insert({
-    wedding_id: weddingId, label, city_id: cityId ?? null, hotel_tier_id: hotelTierId ?? null,
-    estimate_id: estimateId ?? null, is_baseline: isBaseline, notes: notes ?? null,
-  }).select().single();
+    wedding_id: weddingId,
+    label: label.trim(),
+    city_id: cityId ?? null,
+    hotel_tier_id: hotelTierId ?? null,
+    estimate_id: resolvedEstimateId,
+    is_baseline: isBaseline,
+    notes: notes ?? null,
+  }).select(`*, budget_estimates ( id, total_min, total_max, total_mid, line_items ), cities ( label ), hotel_tiers ( label )`).single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json({ scenario: data });
+});
+
+// DELETE /api/report/scenarios/:id
+router.delete('/scenarios/:id', requireAuth, async (req, res) => {
+  const { data: scenario, error: fetchErr } = await supabaseAdmin
+    .from('scenarios')
+    .select('id, wedding_id')
+    .eq('id', req.params.id)
+    .single();
+
+  if (fetchErr || !scenario) return res.status(404).json({ error: 'Scenario not found.' });
+
+  const access = await ensureWeddingAccess(scenario.wedding_id, req.profile);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+
+  const { error } = await supabaseAdmin.from('scenarios').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ message: 'Scenario deleted.' });
 });
 
 module.exports = router;

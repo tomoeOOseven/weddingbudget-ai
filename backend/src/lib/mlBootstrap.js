@@ -2,7 +2,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 function startEmbeddedMlService() {
-  if (process.env.EMBEDDED_ML_SERVICE !== '1') {
+  if (process.env.EMBEDDED_ML_SERVICE === '0') {
     return null;
   }
 

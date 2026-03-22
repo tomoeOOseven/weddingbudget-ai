@@ -102,7 +102,7 @@ export default function WeddingDashboard({ onSelectWedding }) {
                 </div>
                 <div>
                   <label style={S.label}>Total Guests (approx)</label>
-                  <input style={S.input} type="number" value={form.totalGuests} onChange={e => setForm(f => ({...f, totalGuests: e.target.value}))} placeholder="300" />
+                  <input style={S.input} type="number" step={50} value={form.totalGuests} onChange={e => setForm(f => ({...f, totalGuests: e.target.value}))} placeholder="300" />
                 </div>
               </div>
               <div style={{ display:'flex', gap:10 }}>

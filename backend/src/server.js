@@ -9,6 +9,13 @@ const { startEmbeddedMlService } = require('./lib/mlBootstrap');
 const app  = express();
 const PORT = process.env.PORT || 4000;
 
+if (!process.env.EMBEDDED_ML_SERVICE) {
+  process.env.EMBEDDED_ML_SERVICE = '1';
+}
+if (!process.env.ML_SERVICE_URL) {
+  process.env.ML_SERVICE_URL = `http://127.0.0.1:${process.env.ML_SERVICE_PORT || 8000}`;
+}
+
 const configuredOrigins = (process.env.FRONTEND_URL || '')
   .split(',')
   .map((s) => s.trim())

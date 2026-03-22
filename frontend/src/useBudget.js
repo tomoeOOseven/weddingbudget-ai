@@ -1,7 +1,8 @@
 // useBudget.js — central wizard state + live client-side budget calc
 import { useState, useMemo, useCallback } from 'react';
 
-const INITIAL = {
+function createInitialInputs() {
+  return {
   city:        'udaipur',    // slug key — matches new API
   hotelTier:   'palace',
   rooms:       60,
@@ -22,10 +23,55 @@ const INITIAL = {
   gifts:       true,
   stationery:  true,
   photography: true,
-};
+  };
+}
+
+function ensureSet(value, fallbackSet) {
+  if (value instanceof Set) return new Set(value);
+  if (Array.isArray(value)) return new Set(value);
+  return new Set(fallbackSet);
+}
+
+export function serializeBudgetInputs(inputs) {
+  return {
+    ...inputs,
+    functions: [...inputs.functions],
+    selectedDecors: [...inputs.selectedDecors],
+    selectedArtists: [...inputs.selectedArtists],
+    selectedMeals: [...inputs.selectedMeals],
+    specialtyCounters: [...inputs.specialtyCounters],
+    sfx: [...inputs.sfx],
+  };
+}
+
+export function normalizeBudgetInputs(raw = {}) {
+  const initial = createInitialInputs();
+  return {
+    city: raw.city ?? initial.city,
+    hotelTier: raw.hotelTier ?? initial.hotelTier,
+    rooms: Number.isFinite(Number(raw.rooms)) ? Number(raw.rooms) : initial.rooms,
+    guests: Number.isFinite(Number(raw.guests)) ? Number(raw.guests) : initial.guests,
+    outstationPct: Number.isFinite(Number(raw.outstationPct)) ? Number(raw.outstationPct) : initial.outstationPct,
+    functions: ensureSet(raw.functions, initial.functions),
+    selectedDecors: ensureSet(raw.selectedDecors, initial.selectedDecors),
+    selectedArtists: ensureSet(raw.selectedArtists, initial.selectedArtists),
+    selectedMeals: ensureSet(raw.selectedMeals, initial.selectedMeals),
+    barTier: raw.barTier ?? initial.barTier,
+    specialtyCounters: ensureSet(raw.specialtyCounters, initial.specialtyCounters),
+    transfers: typeof raw.transfers === 'boolean' ? raw.transfers : initial.transfers,
+    ghodi: typeof raw.ghodi === 'boolean' ? raw.ghodi : initial.ghodi,
+    dholis: Number.isFinite(Number(raw.dholis)) ? Number(raw.dholis) : initial.dholis,
+    sfx: ensureSet(raw.sfx, initial.sfx),
+    roomBaskets: typeof raw.roomBaskets === 'boolean' ? raw.roomBaskets : initial.roomBaskets,
+    rituals: typeof raw.rituals === 'boolean' ? raw.rituals : initial.rituals,
+    gifts: typeof raw.gifts === 'boolean' ? raw.gifts : initial.gifts,
+    stationery: typeof raw.stationery === 'boolean' ? raw.stationery : initial.stationery,
+    photography: typeof raw.photography === 'boolean' ? raw.photography : initial.photography,
+  };
+}
 
 export function useBudget(refData) {
-  const [inputs, setInputs] = useState(INITIAL);
+  const [inputs, setInputs] = useState(() => createInitialInputs());
   const [step, setStep]     = useState(1);
 
   const set    = useCallback((key, val) => setInputs(p => ({ ...p, [key]: val })), []);
@@ -34,6 +80,8 @@ export function useBudget(refData) {
     s.has(id) ? s.delete(id) : s.add(id);
     return { ...p, [key]: s };
   }), []);
+  const hydrateInputs = useCallback((nextInputs) => setInputs(normalizeBudgetInputs(nextInputs)), []);
+  const resetInputs = useCallback(() => setInputs(createInitialInputs()), []);
 
   // ── cities / hotels are now slug-keyed objects, not arrays ──────────────────
   const citiesObj  = refData?.cities     ?? {};
@@ -158,5 +206,5 @@ export function useBudget(refData) {
     };
   }, [inputs, cm, hd, nFn, refData]);
 
-  return { inputs, set, toggle, step, setStep, budget, cm, hd };
+  return { inputs, set, toggle, hydrateInputs, resetInputs, step, setStep, budget, cm, hd };
 }
