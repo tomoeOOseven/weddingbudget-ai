@@ -4,7 +4,15 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { fetchWeddings, createWedding, deleteWedding } from '../api.js';
 import { FiCalendar, FiMapPin, FiTrash2, FiUserCheck, FiUsers } from 'react-icons/fi';
 
-function fmt(n) { return n ? '₹' + Number(n).toLocaleString('en-IN') : '—'; }
+function fmtCompactINR(n) {
+  if (n === null || n === undefined) return '—';
+  const value = Number(n);
+  if (!Number.isFinite(value)) return '—';
+  const abs = Math.abs(value);
+  if (abs >= 10000000) return `₹${(value / 10000000).toFixed(abs >= 100000000 ? 1 : 2)}Cr`;
+  if (abs >= 100000) return `₹${(value / 100000).toFixed(abs >= 1000000 ? 1 : 2)}L`;
+  return `₹${value.toLocaleString('en-IN')}`;
+}
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : null; }
 
 export default function WeddingDashboard({ onSelectWedding }) {
@@ -147,7 +155,7 @@ export default function WeddingDashboard({ onSelectWedding }) {
                       <div style={{ textAlign:'right' }}>
                         <div style={{ fontSize:11, color:'var(--muted)', marginBottom:2 }}>Current estimate</div>
                         <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:'var(--maroon)', fontWeight:700 }}>
-                          {fmt(estimate.total_min)} – {fmt(estimate.total_max)}
+                          {fmtCompactINR(estimate.total_min)} – {fmtCompactINR(estimate.total_max)}
                         </div>
                       </div>
                     ) : (

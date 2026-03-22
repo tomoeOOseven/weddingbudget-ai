@@ -618,7 +618,7 @@ export default function AdminLabelling() {
 
       {/* Stats */}
       <div style={S.stats}>
-        <StatPill label="Awaiting Label"    value={stats.totalRaw}           color="#b45309" />
+        <StatPill label="Awaiting Label"    value={stats.queueCount ?? 0}    color="#b45309" />
         <StatPill label="Labelled Images"   value={stats.totalLabelled}      color="#15803d" />
         <StatPill label="In Training Set"   value={stats.inTraining}         color="#7a1c1c" />
         <StatPill label="Pending Sign-off"  value={stats.pendingSuggestions} color="#6d28d9" />

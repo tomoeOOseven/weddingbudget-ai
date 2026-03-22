@@ -14,6 +14,7 @@ import AdminCostData        from './admin/AdminCostData.jsx';
 import AdminScraper         from './admin/AdminScraper.jsx';
 import AdminPlaceholder     from './admin/AdminPlaceholder.jsx';
 import ClientLogin          from './pages/ClientLogin.jsx';
+import HomePage             from './pages/HomePage.jsx';
 import App                  from './App.jsx';
 import { FiImage }          from 'react-icons/fi';
 
@@ -21,8 +22,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <AuthProvider>
     <BrowserRouter>
       <Routes>
-        {/* Client app */}
-        <Route path="/"      element={<App />} />
+        {/* Landing + client app */}
+        <Route path="/"      element={<HomePage />} />
+        <Route path="/app"   element={<App />} />
         <Route path="/login" element={<ClientLogin />} />
 
         {/* Admin auth */}

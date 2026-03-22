@@ -32,7 +32,7 @@ export default function ClientLogin() {
 
   // Redirect if already logged in — uses AuthContext, no extra getSession() call
   useEffect(() => {
-    if (!authLoading && user) navigate('/', { replace: true });
+    if (!authLoading && user) navigate('/app', { replace: true });
   }, [authLoading, user]);
 
   async function handleSubmit(e) {
@@ -42,7 +42,7 @@ export default function ClientLogin() {
       if (mode === 'login') {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
-        navigate('/', { replace: true });
+        navigate('/app', { replace: true });
       } else {
         const { error: err } = await supabase.auth.signUp({
           email, password,

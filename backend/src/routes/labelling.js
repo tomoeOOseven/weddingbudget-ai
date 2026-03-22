@@ -334,7 +334,12 @@ router.put('/suggestions/:id', requireAdmin, async (req, res) => {
     .eq('id', req.params.id);
 
   if (action === 'reject') {
-    return res.json({ message: 'Suggestion rejected. Image remains in queue.' });
+    await supabaseAdmin
+      .from('scraped_images')
+      .update({ status: 'rejected' })
+      .eq('id', suggestion.image_id);
+
+    return res.json({ message: 'Suggestion rejected and removed from queue.' });
   }
 
   const finalTags = {
@@ -432,7 +437,7 @@ router.get('/stats', requireAdmin, async (req, res) => {
     supabaseAdmin.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'rejected'),
   ]);
 
-  const queueCount = totalRaw ?? 0;
+  const queueCount = Math.max((totalRaw ?? 0) - (pendingSuggestions ?? 0) - (totalRejected ?? 0), 0);
 
   res.json({ totalRaw, queueCount, totalLabelled, inTraining, pendingSuggestions, totalRejected });
 });
