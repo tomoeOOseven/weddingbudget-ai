@@ -46,6 +46,8 @@ export const deleteActual        = (id) => request(`/api/report/actuals/${id}`, 
 export const fetchScenarios      = (wid) => request(`/api/report/scenarios/${wid}`);
 export const saveScenario        = (data) => request('/api/report/scenarios', { method:'POST', body: JSON.stringify(data) });
 export const deleteScenario      = (id) => request(`/api/report/scenarios/${id}`, { method:'DELETE' });
+export const fetchHomepageContent = () => request('/api/content/homepage');
+export const updateHomepageContent = (data) => request('/api/admin/website-content', { method:'PUT', body: JSON.stringify(data) });
 
 export const downloadPDF = async (payload) => {
   const token = getToken();

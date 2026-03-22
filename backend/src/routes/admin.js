@@ -2,6 +2,7 @@
 const express = require('express');
 const router  = express.Router();
 const { requireAdmin, supabaseAdmin } = require('../middleware/authMiddleware');
+const { getHomepageContent, saveHomepageContent } = require('../lib/siteContentStore');
 
 // ── Generic versioned update helper ──────────────────────────────────────────
 async function updateCostRow(table, id, updates, adminId) {
@@ -173,6 +174,25 @@ router.get('/audit', requireAdmin, async (req, res) => {
   const { data, count, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json({ log: data ?? [], total: count, offset, limit });
+});
+
+// ── WEBSITE CONTENT (homepage cards + games) ───────────────────────────────
+router.get('/website-content', requireAdmin, async (req, res) => {
+  try {
+    const content = await getHomepageContent();
+    res.json({ content });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/website-content', requireAdmin, async (req, res) => {
+  try {
+    const content = await saveHomepageContent(req.body);
+    res.json({ content, message: 'Website content updated.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

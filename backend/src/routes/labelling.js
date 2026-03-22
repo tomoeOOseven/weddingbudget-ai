@@ -429,15 +429,26 @@ router.get('/stats', requireAdmin, async (req, res) => {
     { count: inTraining },
     { count: pendingSuggestions },
     { count: totalRejected },
+    { data: rawImageRows },
+    { data: suggestionRows },
   ] = await Promise.all([
     supabaseAdmin.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'raw'),
     supabaseAdmin.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'labelled'),
     supabaseAdmin.from('image_labels').select('*', { count: 'exact', head: true }).eq('is_in_training', true),
     supabaseAdmin.from('ai_label_suggestions').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabaseAdmin.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'rejected'),
+    supabaseAdmin.from('scraped_images').select('id').eq('status', 'raw'),
+    supabaseAdmin.from('ai_label_suggestions').select('image_id'),
   ]);
 
-  const queueCount = Math.max((totalRaw ?? 0) - (pendingSuggestions ?? 0) - (totalRejected ?? 0), 0);
+  const rawIds = new Set((rawImageRows ?? []).map((row) => row.id));
+  const suggestedRawIds = new Set(
+    (suggestionRows ?? [])
+      .map((row) => row.image_id)
+      .filter((imageId) => rawIds.has(imageId))
+  );
+
+  const queueCount = Math.max(rawIds.size - suggestedRawIds.size, 0);
 
   res.json({ totalRaw, queueCount, totalLabelled, inTraining, pendingSuggestions, totalRejected });
 });

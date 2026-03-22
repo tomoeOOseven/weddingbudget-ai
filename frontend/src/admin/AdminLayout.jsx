@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { FiActivity, FiBarChart2, FiBookOpen, FiClipboard, FiGrid, FiMic, FiShield, FiTag, FiTool, FiTruck } from 'react-icons/fi';
+import { FiActivity, FiBarChart2, FiBookOpen, FiClipboard, FiGrid, FiImage, FiMic, FiShield, FiTag, FiTool, FiTruck } from 'react-icons/fi';
 
 // ── Nav items ──────────────────────────────────────────────────────────────
 
@@ -33,6 +33,7 @@ const NAV = [
   {
     section: 'System',
     items: [
+      { path: '/admin/content',  label: 'Website Content', icon: <FiImage /> },
       { path: '/admin/audit',    label: 'Audit Log',       icon: <FiClipboard /> },
     ],
   },

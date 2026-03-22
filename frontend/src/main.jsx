@@ -13,6 +13,7 @@ import AdminModel           from './admin/AdminModel.jsx';
 import AdminCostData        from './admin/AdminCostData.jsx';
 import AdminScraper         from './admin/AdminScraper.jsx';
 import AdminPlaceholder     from './admin/AdminPlaceholder.jsx';
+import AdminWebsiteContent  from './admin/AdminWebsiteContent.jsx';
 import ClientLogin          from './pages/ClientLogin.jsx';
 import HomePage             from './pages/HomePage.jsx';
 import App                  from './App.jsx';
@@ -41,6 +42,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="logistics" element={<AdminCostData />} />
           <Route path="cities"    element={<AdminCostData />} />
           <Route path="decor"     element={<AdminPlaceholder icon={<FiImage />} title="Decor Library" description="Manage seed decor items. Scraped images are managed via the Labelling Queue." />} />
+          <Route path="content"   element={<AdminWebsiteContent />} />
           <Route path="audit"     element={<AdminCostData />} />
           <Route path="*"         element={<Navigate to="/admin" replace />} />
         </Route>

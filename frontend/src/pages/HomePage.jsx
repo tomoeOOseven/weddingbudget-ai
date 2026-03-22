@@ -1,35 +1,22 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiArrowRight, FiExternalLink, FiGift, FiHome, FiInfo, FiLogIn, FiMapPin, FiPlayCircle, FiUsers } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext.jsx';
+import { fetchHomepageContent } from '../api.js';
 
-import card1 from '../assets/cards/card-1.webp';
-import card2 from '../assets/cards/card-2.webp';
-import card3 from '../assets/cards/card-3.webp';
-import card4 from '../assets/cards/card-4.webp';
-import card5 from '../assets/cards/card-5.webp';
+const FALLBACK_CARD_DESIGNS = [
+  { imageUrl: '/cards/card-1.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAGHX05Aq_4&category=tAEwhV3GgCA&analyticsCorrelationId=19f52fa6-29f8-4bce-8f40-833138075e25&ui=eyJBIjp7fX0' },
+  { imageUrl: '/cards/card-2.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAGHX05Aq_4&category=tAEwhV3GgCA&analyticsCorrelationId=2f84d2d1-7d5b-4eca-87aa-6dceb2e56148&ui=eyJBIjp7fX0' },
+  { imageUrl: '/cards/card-3.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAF6Q0JILnc&category=tAEwhV3GgCA&analyticsCorrelationId=c701427e-197f-42c5-a918-b948f628c313&ui=eyJBIjp7fX0' },
+  { imageUrl: '/cards/card-4.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAFAHubY-xY&category=tAEwhV3GgCA&analyticsCorrelationId=9a9b180d-7546-4b3f-b1bf-e89f2fa3cd9a&ui=eyJBIjp7fX0' },
+  { imageUrl: '/cards/card-5.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAGHYRSfM2M&category=tAEwhV3GgCA&analyticsCorrelationId=d2ca7e22-e222-45d5-8435-6dc8fe6858f6&ui=eyJBIjp7fX0' },
+];
 
-const CARD_DESIGNS = [
-  {
-    image: card1,
-    link: 'https://www.canva.com/design/DAHEtVyLKS0/Tutsal3J2DW5jEoSARoHaQ/edit?ui=eyJBIjp7fX0&referrer=https%3A%2F%2Fwww.canva.com%2Fs%2Ftemplates%3Fquery%3Dwedding%2Binvitation',
-  },
-  {
-    image: card2,
-    link: 'https://canva.com/design?create&type=TACixRR28vY&template=EAGHX05Aq_4&category=tAEwhV3GgCA&analyticsCorrelationId=da4d38f0-f58f-4521-b96d-9d2f9fe9fd31&ui=eyJBIjp7fX0',
-  },
-  {
-    image: card3,
-    link: 'https://canva.com/design?create&type=TACixRR28vY&template=EAF6Q0JILnc&category=tAEwhV3GgCA&analyticsCorrelationId=be43bf7f-ac4c-464a-b736-cc2b3929aff9&ui=eyJBIjp7fX0',
-  },
-  {
-    image: card4,
-    link: 'https://www.canva.com/design/DAHEtcF9jl0/tOGemQQA1C-wCToCY70DSA/edit?ui=eyJBIjp7fX0&referrer=https%3A%2F%2Fwww.canva.com%2Fs%2Ftemplates%3Fquery%3Dwedding%2Binvitation',
-  },
-  {
-    image: card5,
-    link: 'https://www.canva.com/design/DAHEtSCI9SA/rkblSegKnRyLMfvW85AgqA/edit?ui=eyJBIjp7fX0&referrer=https%3A%2F%2Fwww.canva.com%2Fs%2Ftemplates%3Fquery%3Dwedding%2Binvitation',
-  },
+const FALLBACK_GAMES = [
+  { title: 'Shoe Steal (Joota Chupai)', desc: 'Bride side hides the groom shoes during rituals and negotiates a playful ransom.' },
+  { title: 'Couple Trivia Sprint', desc: 'Fast quiz about the bride and groom. Family team with highest score wins.' },
+  { title: 'Wedding Bingo', desc: 'Guests mark moments like baraat dance, varmala, and emotional speeches on custom bingo cards.' },
+  { title: 'Ring Hunt in Flower Bowl', desc: 'Bride and groom search for the ring in a flower bowl. Best of three rounds adds fun competition.' },
 ];
 
 const TABS = [
@@ -67,36 +54,33 @@ export default function HomePage() {
   const { user, isAdmin, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('problem');
   const [cardIndex, setCardIndex] = useState(0);
+  const [cardDesigns, setCardDesigns] = useState(FALLBACK_CARD_DESIGNS);
+  const [games, setGames] = useState(FALLBACK_GAMES);
   const wheelRef = useRef(0);
 
-  const games = useMemo(
-    () => [
-      {
-        title: 'Shoe Steal (Joota Chupai)',
-        desc: 'Bride side hides the groom\'s shoes during rituals and negotiates a fun ransom.',
-      },
-      {
-        title: 'Couple Trivia Sprint',
-        desc: 'Quick-fire questions about the bride and groom. Team with highest score wins.',
-      },
-      {
-        title: 'Wedding Bingo',
-        desc: 'Guests mark moments like baraat dance, varmala, and emotional speeches on bingo cards.',
-      },
-      {
-        title: 'Ring Hunt in Flower Bowl',
-        desc: 'A classic playful contest where bride and groom search for the ring first.',
-      },
-    ],
-    []
-  );
+  useEffect(() => {
+    let mounted = true;
+    fetchHomepageContent()
+      .then((data) => {
+        if (!mounted) return;
+        const nextCards = data?.content?.cards ?? [];
+        const nextGames = data?.content?.games ?? [];
+        if (nextCards.length) setCardDesigns(nextCards);
+        if (nextGames.length) setGames(nextGames);
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function nextCard() {
-    setCardIndex((i) => (i + 1) % CARD_DESIGNS.length);
+    setCardIndex((i) => (i + 1) % cardDesigns.length);
   }
 
   function prevCard() {
-    setCardIndex((i) => (i - 1 + CARD_DESIGNS.length) % CARD_DESIGNS.length);
+    setCardIndex((i) => (i - 1 + cardDesigns.length) % cardDesigns.length);
   }
 
   function handleWheel(e) {
@@ -262,16 +246,16 @@ export default function HomePage() {
                   <div
                     style={{
                       display: 'flex',
-                      width: `${CARD_DESIGNS.length * 100}%`,
-                      transform: `translateX(-${cardIndex * (100 / CARD_DESIGNS.length)}%)`,
+                      width: `${cardDesigns.length * 100}%`,
+                      transform: `translateX(-${cardIndex * (100 / cardDesigns.length)}%)`,
                       transition: 'transform 360ms ease',
                     }}
                   >
-                    {CARD_DESIGNS.map((card, i) => (
-                      <div key={card.link} style={{ width: `${100 / CARD_DESIGNS.length}%`, padding: 12, flexShrink: 0 }}>
-                        <a href={card.link} target="_blank" rel="noreferrer" title="Open design in Canva" style={{ display: 'block' }}>
+                    {cardDesigns.map((card, i) => (
+                      <div key={`${card.canvaUrl}-${i}`} style={{ width: `${100 / cardDesigns.length}%`, padding: 12, flexShrink: 0 }}>
+                        <a href={card.canvaUrl} target="_blank" rel="noreferrer" title="Open design in Canva" style={{ display: 'block' }}>
                           <img
-                            src={card.image}
+                            src={card.imageUrl}
                             alt={`Wedding card design ${i + 1}`}
                             style={{ width: '100%', height: 'clamp(230px, 48vw, 500px)', objectFit: 'cover', borderRadius: 12, boxShadow: '0 10px 25px rgba(33,13,22,0.24)' }}
                           />
@@ -290,7 +274,7 @@ export default function HomePage() {
               </div>
 
               <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 8 }}>
-                {CARD_DESIGNS.map((_, i) => (
+                {cardDesigns.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setCardIndex(i)}

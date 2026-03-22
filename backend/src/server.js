@@ -59,6 +59,7 @@ app.use('/api/scraper',    require('./routes/scraper'));
 app.use('/api/labelling',  require('./routes/labelling'));
 app.use('/api/model',      require('./routes/model'));
 app.use('/api/weddings',   require('./routes/weddings'));
+app.use('/api/content',    require('./routes/content'));
 
 app.get('/health', (req, res) => res.json({ status: 'ok', version: '2.0.0', env: process.env.NODE_ENV }));
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
