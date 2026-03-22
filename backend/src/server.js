@@ -22,6 +22,9 @@ const allowedOrigins = [
   ...(process.env.NODE_ENV === 'production' ? [] : localOrigins),
 ];
 
+// Trust the first proxy (Render, Vercel, etc.)
+app.set('trust proxy', 1);
+
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({
   origin(origin, callback) {
