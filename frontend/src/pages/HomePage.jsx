@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiArrowRight, FiExternalLink, FiGift, FiHome, FiInfo, FiLogIn, FiMapPin, FiPlayCircle, FiUsers } from 'react-icons/fi';
+import { FiArrowLeft, FiArrowRight, FiExternalLink, FiGift, FiLogIn, FiMapPin, FiPlayCircle, FiUsers } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchHomepageContent } from '../api.js';
 
@@ -13,15 +13,30 @@ const FALLBACK_CARD_DESIGNS = [
 ];
 
 const FALLBACK_GAMES = [
-  { title: 'Shoe Steal (Joota Chupai)', desc: 'Bride side hides the groom shoes during rituals and negotiates a playful ransom.' },
-  { title: 'Couple Trivia Sprint', desc: 'Fast quiz about the bride and groom. Family team with highest score wins.' },
-  { title: 'Wedding Bingo', desc: 'Guests mark moments like baraat dance, varmala, and emotional speeches on custom bingo cards.' },
-  { title: 'Ring Hunt in Flower Bowl', desc: 'Bride and groom search for the ring in a flower bowl. Best of three rounds adds fun competition.' },
+  {
+    title: 'Joota Chupai Showdown',
+    desc: 'The bride side hides the groom shoes and negotiates a playful ransom while the baraat cheers.',
+    imageUrl: '/games/game-1.jpg',
+  },
+  {
+    title: 'Guess The Couple Moment',
+    desc: 'Guests decode story clues from photos and vows, then race to guess the couple memory first.',
+    imageUrl: '/games/game-2.webp',
+  },
+  {
+    title: 'Wedding Bingo',
+    desc: 'Mark iconic moments like varmala smiles, dance circles, and emotional speeches on custom bingo cards.',
+    imageUrl: '/games/game-3.webp',
+  },
+  {
+    title: 'Ring Hunt Challenge',
+    desc: 'Bride and groom search for the hidden ring in a playful bowl game with full family commentary.',
+    imageUrl: '/games/game-4.jpg',
+  },
 ];
 
 const TABS = [
-  { id: 'problem', label: 'Problem Statement', icon: <FiInfo /> },
-  { id: 'about', label: 'About Us', icon: <FiHome /> },
+  { id: 'problem', label: 'Why This Matters', icon: <FiMapPin /> },
   { id: 'games', label: 'Wedding Games', icon: <FiGift /> },
   { id: 'cards', label: 'Card Designs', icon: <FiPlayCircle /> },
 ];
@@ -32,16 +47,18 @@ function TabButton({ active, icon, label, onClick }) {
       onClick={onClick}
       style={{
         border: 'none',
-        borderRadius: 999,
-        background: active ? '#6B1E3A' : '#fff',
-        color: active ? '#E8C97A' : '#5a3543',
-        padding: '10px 16px',
+        background: 'transparent',
+        color: active ? '#E8C97A' : 'rgba(232,201,122,0.72)',
+        padding: '10px 16px 9px',
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        fontSize: 13,
+        fontSize: 11,
         fontWeight: 700,
-        boxShadow: active ? '0 10px 20px rgba(107, 30, 58, 0.25)' : '0 1px 5px rgba(0,0,0,0.08)',
+        letterSpacing: '1px',
+        textTransform: 'uppercase',
+        borderBottom: active ? '2px solid var(--gold)' : '2px solid transparent',
+        cursor: 'pointer',
       }}
     >
       {icon} {label}
@@ -66,7 +83,9 @@ export default function HomePage() {
         const nextCards = data?.content?.cards ?? [];
         const nextGames = data?.content?.games ?? [];
         if (nextCards.length) setCardDesigns(nextCards);
-        if (nextGames.length) setGames(nextGames);
+        if (nextGames.length && nextGames.every((g) => g.title && g.desc && g.imageUrl)) {
+          setGames(nextGames);
+        }
       })
       .catch(() => {});
 
@@ -84,6 +103,7 @@ export default function HomePage() {
   }
 
   function handleWheel(e) {
+    e.preventDefault();
     const now = Date.now();
     if (now - wheelRef.current < 300) return;
     wheelRef.current = now;
@@ -92,142 +112,112 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(1200px 700px at 15% -15%, #f5e8c8 0%, #FBF5E6 45%, #f8efe1 100%)', color: '#2D1520' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--cream)', color: '#2D1520', fontFamily: "'Jost',sans-serif" }}>
       <header
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 20,
-          background: 'rgba(251,245,230,0.92)',
-          backdropFilter: 'blur(8px)',
-          borderBottom: '1px solid #e6d6bf',
-          padding: '12px 20px',
+          background: 'var(--maroon)',
+          padding: '16px 28px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexWrap: 'wrap',
           gap: 12,
         }}
       >
         <div>
-          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 33, fontWeight: 700, color: '#6B1E3A' }}>
+          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 700, color: '#E8C97A' }}>
             WeddingBudget<span style={{ color: '#C4973D' }}>.ai</span>
           </div>
-          <div style={{ fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: '#7A5563' }}>
+          <div style={{ fontSize: 10, color: 'rgba(232,201,122,0.6)', letterSpacing: '2.5px', textTransform: 'uppercase', fontWeight: 300 }}>
             Events By Athea x AI Budget Intelligence
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {isAdmin && (
-            <button onClick={() => navigate('/admin')} style={{ border: '1px solid #d6c4aa', background: '#fff', color: '#6B1E3A', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 12 }}>
+            <button onClick={() => navigate('/admin')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(232,201,122,0.3)', borderRadius: 7, color: 'rgba(232,201,122,0.75)', padding: '7px 12px', fontWeight: 700, fontSize: 12 }}>
               Admin Console
             </button>
           )}
           {loading ? (
-            <span style={{ color: '#7A5563', fontSize: 12 }}>Checking session...</span>
+            <span style={{ color: 'rgba(232,201,122,0.75)', fontSize: 12 }}>Checking session...</span>
           ) : user ? (
-            <button onClick={() => navigate('/app')} style={{ border: 'none', background: '#6B1E3A', color: '#E8C97A', borderRadius: 999, padding: '9px 16px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => navigate('/app')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(232,201,122,0.3)', borderRadius: 7, color: 'rgba(232,201,122,0.85)', padding: '7px 12px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <FiUsers /> My Weddings
             </button>
           ) : (
-            <button onClick={() => navigate('/login')} style={{ border: 'none', background: '#6B1E3A', color: '#E8C97A', borderRadius: 999, padding: '9px 16px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => navigate('/login')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(232,201,122,0.3)', borderRadius: 7, color: 'rgba(232,201,122,0.85)', padding: '7px 12px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <FiLogIn /> Sign In
             </button>
           )}
         </div>
       </header>
 
-      <main style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 18px 48px' }}>
-        <section
-          style={{
-            borderRadius: 24,
-            padding: '30px 24px',
-            background: 'linear-gradient(135deg, #6B1E3A 0%, #3f1222 52%, #6B1E3A 100%)',
-            color: '#F8EDD7',
-            boxShadow: '0 18px 38px rgba(58, 14, 30, 0.28)',
-            marginBottom: 22,
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
-          <div style={{ position: 'absolute', right: -120, top: -90, width: 260, height: 260, borderRadius: '50%', background: 'rgba(232,201,122,0.15)' }} />
-          <div style={{ position: 'relative', maxWidth: 800 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, color: 'rgba(232,201,122,0.85)' }}>
-              Luxury Wedding Planning, now data-driven
-            </div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(34px, 5vw, 54px)', lineHeight: 1.02, marginBottom: 12 }}>
-              Plan smarter budgets for Indian weddings with real intelligence.
-            </h1>
-            <p style={{ fontSize: 15, lineHeight: 1.65, color: 'rgba(248,237,215,0.9)', maxWidth: 760 }}>
-              WeddingBudget.ai turns planner intuition into an AI-assisted estimate engine with city-aware ranges,
-              decor intelligence, and itemized cost visibility.
-            </p>
-            <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-              <button onClick={() => navigate('/app')} style={{ background: '#E8C97A', color: '#3f1222', border: 'none', borderRadius: 9, padding: '11px 16px', fontWeight: 800, fontSize: 13 }}>
-                Start Estimating
-              </button>
-              <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ background: 'transparent', color: '#E8C97A', border: '1px solid rgba(232,201,122,0.5)', borderRadius: 9, padding: '10px 14px', fontWeight: 700, fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                <FiExternalLink /> Events By Athea
-              </a>
-            </div>
-          </div>
-        </section>
+      <div style={{ background: 'var(--maroon-dark)', borderBottom: '1px solid rgba(232,201,122,0.18)', display: 'flex', gap: 2, flexWrap: 'wrap', padding: '0 28px' }}>
+        {TABS.map((tab) => (
+          <TabButton key={tab.id} active={activeTab === tab.id} icon={tab.icon} label={tab.label} onClick={() => setActiveTab(tab.id)} />
+        ))}
+      </div>
 
-        <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-          {TABS.map((tab) => (
-            <TabButton key={tab.id} active={activeTab === tab.id} icon={tab.icon} label={tab.label} onClick={() => setActiveTab(tab.id)} />
-          ))}
-        </section>
-
+      <main style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 20px 48px' }}>
         <section style={{ background: '#fff', border: '1px solid #e4d6c0', borderRadius: 18, padding: '22px 18px', boxShadow: '0 6px 24px rgba(89,35,50,0.08)' }}>
           {activeTab === 'problem' && (
             <div>
-              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Problem Statement</h2>
+              <section
+                style={{
+                  borderRadius: 18,
+                  padding: '24px 20px',
+                  background: 'linear-gradient(135deg, #6B1E3A 0%, #3f1222 55%, #6B1E3A 100%)',
+                  color: '#F8EDD7',
+                  boxShadow: '0 14px 30px rgba(58, 14, 30, 0.25)',
+                  marginBottom: 18,
+                }}
+              >
+                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, color: 'rgba(232,201,122,0.85)' }}>
+                  Luxury wedding planning, now data-backed
+                </div>
+                <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(30px, 5vw, 50px)', lineHeight: 1.02, marginBottom: 12 }}>
+                  Plan smarter Indian wedding budgets with real intelligence.
+                </h1>
+                <p style={{ fontSize: 15, lineHeight: 1.65, color: 'rgba(248,237,215,0.9)', maxWidth: 760 }}>
+                  WeddingBudget.ai helps planners and families move beyond rough guesswork, combining real references,
+                  city-sensitive logic, and service-level detail into one estimate workflow.
+                </p>
+                <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+                  <button onClick={() => navigate('/app')} style={{ background: '#E8C97A', color: '#3f1222', border: 'none', borderRadius: 9, padding: '11px 16px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                    Start Estimating
+                  </button>
+                  <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ background: 'transparent', color: '#E8C97A', border: '1px solid rgba(232,201,122,0.5)', borderRadius: 9, padding: '10px 14px', fontWeight: 700, fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                    <FiExternalLink /> Events By Athea
+                  </a>
+                </div>
+              </section>
+
+              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Where WeddingBudget.ai Helps</h2>
               <p style={{ color: '#5a3543', lineHeight: 1.8, fontSize: 15 }}>
-                Wedding budget planning in India is an art passed down through experience. Planners rely on gut feel and
-                memory from past projects to estimate budgets. There is no data-driven tool that can intelligently
-                estimate a wedding budget based on city, hotel category, number of rooms, decor style, guest count,
-                and service requirements.
+                In most Indian weddings, budgets are still created from intuition, legacy spreadsheets, and memory from
+                past events. That makes early planning vulnerable to underestimation across city, venue category, guest
+                volume, decor style, artist selection, and logistics complexity.
               </p>
               <p style={{ color: '#5a3543', lineHeight: 1.8, fontSize: 15, marginTop: 12 }}>
-                The challenge is to build WeddingBudget.ai, an AI-powered budget estimation engine that scrapes
-                real-world design references, maps artist and logistics costs, and delivers a client-facing budget
-                estimate with intelligent ranges and itemized breakdowns.
+                WeddingBudget.ai brings those decisions into one AI-assisted system: reference-driven decor intelligence,
+                scenario-based budgeting, and client-facing ranges with itemized breakdowns so teams can plan with
+                confidence from day one.
               </p>
-            </div>
-          )}
-
-          {activeTab === 'about' && (
-            <div>
-              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>About Events By Athea</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 12, marginTop: 14 }}>
-                {[
-                  { k: 'Company', v: 'Events By Athea' },
-                  { k: 'Category', v: 'Event Planner' },
-                  { k: 'Speciality', v: 'Bespoke Wedding Designers and Luxury Events' },
-                  { k: 'Founder', v: '@shubhiagrawal08' },
-                  { k: 'Recognition', v: 'ET Panache Women of the Year' },
-                ].map((item) => (
-                  <div key={item.k} style={{ border: '1px solid #ecdcc4', borderRadius: 12, padding: '12px 14px', background: '#fffdf9' }}>
-                    <div style={{ fontSize: 11, color: '#7A5563', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{item.k}</div>
-                    <div style={{ fontWeight: 700, color: '#3f1222' }}>{item.v}</div>
-                  </div>
-                ))}
-              </div>
-              <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: '#6B1E3A', fontWeight: 700 }}>
-                <FiMapPin /> Visit Instagram Profile
-              </a>
             </div>
           )}
 
           {activeTab === 'games' && (
             <div>
               <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Fun Wedding Games</h2>
-              <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+              <div style={{ display: 'grid', gap: 14, marginTop: 14 }}>
                 {games.map((game, i) => (
-                  <article key={game.title} style={{ border: '1px solid #ecdcc4', borderRadius: 12, padding: '12px 14px', background: i % 2 === 0 ? '#fffdf9' : '#fff' }}>
-                    <div style={{ fontWeight: 800, color: '#6B1E3A', marginBottom: 4 }}>{game.title}</div>
-                    <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.6 }}>{game.desc}</div>
+                  <article key={`${game.title}-${i}`} style={{ border: '1px solid #ecdcc4', borderRadius: 14, background: '#fffdf9', overflow: 'hidden' }}>
+                    <img src={game.imageUrl} alt={game.title} style={{ width: '100%', height: 'clamp(180px, 33vw, 290px)', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ padding: '12px 14px' }}>
+                      <div style={{ fontWeight: 800, color: '#6B1E3A', marginBottom: 4 }}>{game.title}</div>
+                      <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.6 }}>{game.desc}</div>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -235,13 +225,10 @@ export default function HomePage() {
           )}
 
           {activeTab === 'cards' && (
-            <div onWheel={handleWheel}>
+            <div>
               <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Wedding Card Designs</h2>
-              <p style={{ color: '#5a3543', lineHeight: 1.7, fontSize: 14, marginBottom: 14 }}>
-                Use arrows or scroll over the slider to browse. Click a design to open and customize it on Canva.
-              </p>
 
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative' }} onWheel={handleWheel}>
                 <div style={{ overflow: 'hidden', borderRadius: 14, border: '1px solid #ead7be', background: '#f8efe1' }}>
                   <div
                     style={{
@@ -257,7 +244,7 @@ export default function HomePage() {
                           <img
                             src={card.imageUrl}
                             alt={`Wedding card design ${i + 1}`}
-                            style={{ width: '100%', height: 'clamp(230px, 48vw, 500px)', objectFit: 'cover', borderRadius: 12, boxShadow: '0 10px 25px rgba(33,13,22,0.24)' }}
+                            style={{ width: '100%', height: 'min(78vh, 920px)', objectFit: 'contain', borderRadius: 12, background: '#fff', boxShadow: '0 10px 25px rgba(33,13,22,0.24)' }}
                           />
                         </a>
                       </div>
@@ -285,6 +272,27 @@ export default function HomePage() {
               </div>
             </div>
           )}
+        </section>
+
+        <section style={{ marginTop: 22, borderRadius: 18, border: '1px solid #e4d6c0', background: '#fff', padding: '20px 18px', boxShadow: '0 6px 24px rgba(89,35,50,0.08)' }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, marginBottom: 8, color: '#2D1520' }}>About Events By Athea</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, marginTop: 14 }}>
+            {[
+              { k: 'Company', v: 'Events By Athea' },
+              { k: 'Category', v: 'Event Planner' },
+              { k: 'Speciality', v: 'Bespoke Wedding Designers and Luxury Events' },
+              { k: 'Founder', v: '@shubhiagrawal08' },
+              { k: 'Recognition', v: 'ET Panache Women of the Year' },
+            ].map((item) => (
+              <div key={item.k} style={{ border: '1px solid #ecdcc4', borderRadius: 12, padding: '12px 14px', background: '#fffdf9' }}>
+                <div style={{ fontSize: 11, color: '#7A5563', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{item.k}</div>
+                <div style={{ fontWeight: 700, color: '#3f1222' }}>{item.v}</div>
+              </div>
+            ))}
+          </div>
+          <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: '#6B1E3A', fontWeight: 700 }}>
+            <FiMapPin /> Visit Instagram Profile
+          </a>
         </section>
       </main>
     </div>

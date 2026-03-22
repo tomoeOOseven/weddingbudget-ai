@@ -196,6 +196,9 @@ export default function App() {
           </div>
         </div>
         <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+          <button onClick={() => navigate('/')} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
+            Home
+          </button>
           {user ? (
             <button onClick={() => setActiveWedding(null)} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
               ← My Weddings

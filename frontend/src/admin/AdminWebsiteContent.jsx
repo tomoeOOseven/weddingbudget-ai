@@ -81,8 +81,8 @@ export default function AdminWebsiteContent() {
           .map((c) => ({ imageUrl: (c.imageUrl || '').trim(), canvaUrl: (c.canvaUrl || '').trim() }))
           .filter((c) => c.imageUrl && c.canvaUrl),
         games: games
-          .map((g) => ({ title: (g.title || '').trim(), desc: (g.desc || '').trim() }))
-          .filter((g) => g.title && g.desc),
+          .map((g) => ({ title: (g.title || '').trim(), desc: (g.desc || '').trim(), imageUrl: (g.imageUrl || '').trim() }))
+          .filter((g) => g.title && g.desc && g.imageUrl),
       };
       const data = await apiFetch('/api/admin/website-content', {
         method: 'PUT',
@@ -177,7 +177,7 @@ export default function AdminWebsiteContent() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontWeight: 700, color: '#1a0a0a' }}>Fun Wedding Games</div>
           <button
-            onClick={() => setGames((prev) => [...prev, { title: '', desc: '' }])}
+            onClick={() => setGames((prev) => [...prev, { title: '', desc: '', imageUrl: '' }])}
             style={{
               padding: '7px 12px',
               border: '1px solid #e0d5c5',
@@ -195,9 +195,10 @@ export default function AdminWebsiteContent() {
         <div style={{ display: 'grid', gap: 10 }}>
           {games.map((game, i) => (
             <div key={i} style={{ border: '1px solid #f0e8e0', borderRadius: 10, padding: 10, background: '#fffdf9' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 10, alignItems: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1.4fr auto', gap: 10, alignItems: 'center' }}>
                 <Input value={game.title || ''} onChange={(e) => updateGame(i, 'title', e.target.value)} placeholder="Game title" />
                 <Input value={game.desc || ''} onChange={(e) => updateGame(i, 'desc', e.target.value)} placeholder="Game description" />
+                <Input value={game.imageUrl || ''} onChange={(e) => updateGame(i, 'imageUrl', e.target.value)} placeholder="Image URL (e.g. /games/game-1.jpg)" />
                 <button
                   onClick={() => setGames((prev) => prev.filter((_, idx) => idx !== i))}
                   style={{

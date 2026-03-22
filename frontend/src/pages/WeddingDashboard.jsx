@@ -80,9 +80,14 @@ export default function WeddingDashboard({ onSelectWedding }) {
           <div style={S.logo}>WeddingBudget<span>.ai</span></div>
           <div style={S.greeting}>Welcome back, {profile?.full_name?.split(' ')[0] ?? 'there'} <FiUserCheck style={{ verticalAlign:'middle' }} /></div>
         </div>
-        <button onClick={signOut} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:12, padding:'7px 14px', cursor:'pointer', fontFamily:"'Jost',sans-serif" }}>
-          Sign out
-        </button>
+        <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+          <button onClick={() => navigate('/')} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:12, padding:'7px 14px', cursor:'pointer', fontFamily:"'Jost',sans-serif" }}>
+            Home
+          </button>
+          <button onClick={signOut} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:12, padding:'7px 14px', cursor:'pointer', fontFamily:"'Jost',sans-serif" }}>
+            Sign out
+          </button>
+        </div>
       </div>
 
       <div style={S.body}>

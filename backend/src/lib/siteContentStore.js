@@ -28,20 +28,24 @@ const DEFAULT_HOMEPAGE_CONTENT = {
   ],
   games: [
     {
-      title: 'Shoe Steal (Joota Chupai)',
-      desc: 'Bride side hides the groom shoes during rituals and negotiates a playful ransom.',
+      title: 'Joota Chupai Showdown',
+      desc: 'The bride side hides the groom shoes and negotiates a playful ransom while the baraat cheers.',
+      imageUrl: '/games/game-1.jpg',
     },
     {
-      title: 'Couple Trivia Sprint',
-      desc: 'Fast quiz about the bride and groom. Family team with highest score wins.',
+      title: 'Guess The Couple Moment',
+      desc: 'Guests decode story clues from photos and vows, then race to guess the couple memory first.',
+      imageUrl: '/games/game-2.webp',
     },
     {
       title: 'Wedding Bingo',
-      desc: 'Guests mark moments like baraat dance, varmala, and emotional speeches on custom bingo cards.',
+      desc: 'Mark iconic moments like varmala smiles, dance circles, and emotional speeches on custom bingo cards.',
+      imageUrl: '/games/game-3.webp',
     },
     {
-      title: 'Ring Hunt in Flower Bowl',
-      desc: 'Bride and groom search for the ring in a flower bowl. Best of three rounds adds fun competition.',
+      title: 'Ring Hunt Challenge',
+      desc: 'Bride and groom search for the hidden ring in a playful bowl game with full family commentary.',
+      imageUrl: '/games/game-4.jpg',
     },
   ],
 };
@@ -62,8 +66,9 @@ function normalizeGames(games) {
     .map((g) => ({
       title: String(g?.title || '').trim(),
       desc: String(g?.desc || '').trim(),
+      imageUrl: String(g?.imageUrl || '').trim(),
     }))
-    .filter((g) => g.title && g.desc);
+    .filter((g) => g.title && g.desc && g.imageUrl);
 }
 
 function normalizeContent(raw = {}) {
