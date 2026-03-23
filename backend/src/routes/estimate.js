@@ -7,6 +7,9 @@ const { calculateBudget } = require('../services/budgetService');
 const { predictCost }     = require('../services/mlService');
 const { requireAuth }     = require('../middleware/authMiddleware');
 
+const ML_PREDICT_ENABLED = String(process.env.ML_PREDICT_ENABLED || '').toLowerCase() === 'true'
+  || process.env.ML_PREDICT_ENABLED === '1';
+
 // Load reference data once and cache (refreshed every 10 min)
 let _refData = null, _refDataAt = 0;
 async function getRefData() {
@@ -52,9 +55,9 @@ router.post('/', async (req, res) => {
     const result  = calculateBudget(req.body, refData);
     let currentEstimateId = null;
 
-    // If decor items selected, try ML inference for better estimates
+    // Optional ML inference for decor items (disabled by default).
     const arrDecors = Array.isArray(req.body.selectedDecors) ? req.body.selectedDecors : [...(req.body.selectedDecors ?? [])];
-    if (arrDecors.length > 0) {
+    if (ML_PREDICT_ENABLED && arrDecors.length > 0) {
       const cityMult     = refData.cities?.[req.body.city]?.mult ?? 1.0;
       const hotelMult    = refData.hotelTiers?.[req.body.hotelTier]?.decorMult ?? 1.0;
       const mlPredictions = await Promise.all(
@@ -67,6 +70,9 @@ router.post('/', async (req, res) => {
       // Replace decor line items with ML predictions where available
       result.mlEnhanced = mlPredictions.filter(Boolean).length > 0;
       result.mlPredictions = mlPredictions.filter(Boolean);
+    } else {
+      result.mlEnhanced = false;
+      result.mlPredictions = [];
     }
 
     // Save estimate to DB if client is authenticated
