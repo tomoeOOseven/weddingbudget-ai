@@ -9,7 +9,7 @@ router.get('/all', async (req, res) => {
       { data: cities }, { data: hotelTiers }, { data: artists },
       { data: meals }, { data: barTiers }, { data: specialtyCounters },
       { data: logisticsRates }, { data: sfxItems }, { data: sundriesConfig },
-      { data: decor },
+      { data: decor }, { data: eventFunctions },
     ] = await Promise.all([
       supabase.from('cities').select('*').eq('is_active', true).order('label'),
       supabase.from('hotel_tiers').select('*').eq('is_active', true),
@@ -21,6 +21,7 @@ router.get('/all', async (req, res) => {
       supabase.from('sfx_items').select('*').eq('is_active', true),
       supabase.from('sundries_config').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1),
       supabase.from('decor_items').select('*').eq('is_active', true).order('function_type'),
+      supabase.from('event_functions').select('id, slug, label, emoji, sort_order').eq('is_active', true).order('sort_order').order('label'),
     ]);
 
     const { data: scrapedDecor } = await supabase
@@ -30,9 +31,13 @@ router.get('/all', async (req, res) => {
       .order('created_at', { ascending: false })
       .limit(300);
 
-    const L = logisticsRates?.[0] ?? {};
-    const S = sundriesConfig?.[0]  ?? {};
+    const L = logisticsRates?.[0];
+    const S = sundriesConfig?.[0];
     const SURL = process.env.SUPABASE_URL;
+
+    if (!L || !S) {
+      return res.status(500).json({ error: 'Required reference config missing in database.' });
+    }
 
     const cityMap  = Object.fromEntries((cities ?? []).map(c => [c.slug, { mult: c.multiplier, label: c.label, region: c.region, id: c.id }]));
     const hotelMap = Object.fromEntries((hotelTiers ?? []).map(h => [h.slug, { label: h.label, roomRate: h.room_rate, costMult: h.cost_mult, decorMult: h.decor_mult, id: h.id }]));
@@ -64,14 +69,30 @@ router.get('/all', async (req, res) => {
       barTiers: (barTiers ?? []).map(b => ({ id: b.id, slug: b.slug, label: b.label, costMinPH: b.cost_min_ph, costMaxPH: b.cost_max_ph })),
       specialtyCounters: (specialtyCounters ?? []).map(c => ({ id: c.id, slug: c.slug, label: c.label, costMin: c.cost_min, costMax: c.cost_max })),
       sfxItems: (sfxItems ?? []).map(s => ({ id: s.id, slug: s.slug, label: s.label, cost: s.cost_fixed, unit: s.unit })),
-      logistics: { vehiclePerHead: L.guests_per_vehicle ?? 3, vehicleRateMin: L.vehicle_rate_min ?? 4500, vehicleRateMax: L.vehicle_rate_max ?? 7000, ghodiMin: L.ghodi_min ?? 45000, ghodiMax: L.ghodi_max ?? 90000, dholiUnitMin: L.dholi_unit_min ?? 15000, dholiUnitMax: L.dholi_unit_max ?? 30000 },
-      sundries: { roomBasketMin: S.room_basket_min ?? 1800, roomBasketMax: S.room_basket_max ?? 3500, ritualPerFnMin: S.ritual_per_fn_min ?? 35000, ritualPerFnMax: S.ritual_per_fn_max ?? 75000, giftPerGuestMin: S.gift_per_guest_min ?? 500, giftPerGuestMax: S.gift_per_guest_max ?? 1500, stationeryPerGuestMin: S.stationery_per_guest_min ?? 200, stationeryPerGuestMax: S.stationery_per_guest_max ?? 500, photographyMin: S.photography_min ?? 180000, photographyMax: S.photography_max ?? 550000, contingencyPct: S.contingency_pct ?? 0.05 },
+      logistics: {
+        vehiclePerHead: L.guests_per_vehicle,
+        vehicleRateMin: L.vehicle_rate_min,
+        vehicleRateMax: L.vehicle_rate_max,
+        ghodiMin: L.ghodi_min,
+        ghodiMax: L.ghodi_max,
+        dholiUnitMin: L.dholi_unit_min,
+        dholiUnitMax: L.dholi_unit_max,
+      },
+      sundries: {
+        roomBasketMin: S.room_basket_min,
+        roomBasketMax: S.room_basket_max,
+        ritualPerFnMin: S.ritual_per_fn_min,
+        ritualPerFnMax: S.ritual_per_fn_max,
+        giftPerGuestMin: S.gift_per_guest_min,
+        giftPerGuestMax: S.gift_per_guest_max,
+        stationeryPerGuestMin: S.stationery_per_guest_min,
+        stationeryPerGuestMax: S.stationery_per_guest_max,
+        photographyMin: S.photography_min,
+        photographyMax: S.photography_max,
+        contingencyPct: S.contingency_pct,
+      },
       decor: [...seedDecor, ...scrapedMapped],
-      functions: [
-        { id: 'haldi', label: 'Haldi', emoji: '💛' }, { id: 'mehendi', label: 'Mehendi', emoji: '🌿' },
-        { id: 'sangeet', label: 'Sangeet', emoji: '🎵' }, { id: 'baraat', label: 'Baraat', emoji: '🐴' },
-        { id: 'pheras', label: 'Pheras', emoji: '🔥' }, { id: 'reception', label: 'Reception', emoji: '✨' },
-      ],
+      functions: (eventFunctions ?? []).map((fn) => ({ id: fn.slug, label: fn.label, emoji: fn.emoji })),
     });
   } catch (err) {
     console.error('[data/all]', err.message);

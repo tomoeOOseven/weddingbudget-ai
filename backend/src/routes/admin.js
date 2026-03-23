@@ -188,7 +188,7 @@ router.get('/website-content', requireAdmin, async (req, res) => {
 
 router.put('/website-content', requireAdmin, async (req, res) => {
   try {
-    const content = await saveHomepageContent(req.body);
+    const content = await saveHomepageContent(req.body, req.profile.id);
     res.json({ content, message: 'Website content updated.' });
   } catch (err) {
     res.status(500).json({ error: err.message });

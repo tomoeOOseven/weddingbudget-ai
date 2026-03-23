@@ -4,37 +4,6 @@ import { FiArrowLeft, FiArrowRight, FiGift, FiHome, FiLogIn, FiPlayCircle, FiUse
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchHomepageContent } from '../api.js';
 
-const FALLBACK_CARD_DESIGNS = [
-  { imageUrl: '/cards/card-1.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAGHX05Aq_4&category=tAEwhV3GgCA&analyticsCorrelationId=19f52fa6-29f8-4bce-8f40-833138075e25&ui=eyJBIjp7fX0' },
-  { imageUrl: '/cards/card-2.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAGHX05Aq_4&category=tAEwhV3GgCA&analyticsCorrelationId=2f84d2d1-7d5b-4eca-87aa-6dceb2e56148&ui=eyJBIjp7fX0' },
-  { imageUrl: '/cards/card-3.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAF6Q0JILnc&category=tAEwhV3GgCA&analyticsCorrelationId=c701427e-197f-42c5-a918-b948f628c313&ui=eyJBIjp7fX0' },
-  { imageUrl: '/cards/card-4.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAFAHubY-xY&category=tAEwhV3GgCA&analyticsCorrelationId=9a9b180d-7546-4b3f-b1bf-e89f2fa3cd9a&ui=eyJBIjp7fX0' },
-  { imageUrl: '/cards/card-5.webp', canvaUrl: 'https://www.canva.com/design?create&type=TACixRR28vY&template=EAGHYRSfM2M&category=tAEwhV3GgCA&analyticsCorrelationId=d2ca7e22-e222-45d5-8435-6dc8fe6858f6&ui=eyJBIjp7fX0' },
-];
-
-const FALLBACK_GAMES = [
-  {
-    title: 'Joota Chupai Showdown',
-    desc: 'The bride side hides the groom shoes and negotiates a playful ransom while the baraat cheers.',
-    imageUrl: '/games/game-1.jpg',
-  },
-  {
-    title: 'Guess The Couple Moment',
-    desc: 'Guests decode story clues from photos and vows, then race to guess the couple memory first.',
-    imageUrl: '/games/game-2.webp',
-  },
-  {
-    title: 'Wedding Bingo',
-    desc: 'Mark iconic moments like varmala smiles, dance circles, and emotional speeches on custom bingo cards.',
-    imageUrl: '/games/game-3.webp',
-  },
-  {
-    title: 'Ring Hunt Challenge',
-    desc: 'Bride and groom search for the hidden ring in a playful bowl game with full family commentary.',
-    imageUrl: '/games/game-4.webp',
-  },
-];
-
 const TABS = [
   { id: 'problem', label: 'Home', icon: <FiHome /> },
   { id: 'games', label: 'Wedding Games', icon: <FiGift /> },
@@ -71,8 +40,8 @@ export default function HomePage() {
   const { user, profile, isAdmin, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('problem');
   const [cardIndex, setCardIndex] = useState(0);
-  const [cardDesigns, setCardDesigns] = useState(FALLBACK_CARD_DESIGNS);
-  const [games, setGames] = useState(FALLBACK_GAMES);
+  const [cardDesigns, setCardDesigns] = useState([]);
+  const [games, setGames] = useState([]);
   const wheelRef = useRef(0);
 
   useEffect(() => {
@@ -82,10 +51,8 @@ export default function HomePage() {
         if (!mounted) return;
         const nextCards = data?.content?.cards ?? [];
         const nextGames = data?.content?.games ?? [];
-        if (nextCards.length) setCardDesigns(nextCards);
-        if (nextGames.length && nextGames.every((g) => g.title && g.desc && g.imageUrl)) {
-          setGames(nextGames);
-        }
+        setCardDesigns(nextCards.filter((c) => c?.imageUrl && c?.canvaUrl));
+        setGames(nextGames.filter((g) => g?.title && g?.desc && g?.imageUrl));
       })
       .catch(() => {});
 
@@ -101,10 +68,12 @@ export default function HomePage() {
   }, [loading, user, isAdmin, navigate]);
 
   function nextCard() {
+    if (cardDesigns.length === 0) return;
     setCardIndex((i) => (i + 1) % cardDesigns.length);
   }
 
   function prevCard() {
+    if (cardDesigns.length === 0) return;
     setCardIndex((i) => (i - 1 + cardDesigns.length) % cardDesigns.length);
   }
 
@@ -234,17 +203,23 @@ export default function HomePage() {
           {activeTab === 'games' && (
             <div>
               <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Fun Wedding Games</h2>
-              <div style={{ display: 'grid', gap: 14, marginTop: 14 }}>
-                {games.map((game, i) => (
-                  <article key={`${game.title}-${i}`} style={{ border: '1px solid #ecdcc4', borderRadius: 14, background: '#fffdf9', overflow: 'hidden' }}>
-                    <img src={game.imageUrl} alt={game.title} style={{ width: '100%', height: 'clamp(180px, 33vw, 290px)', objectFit: 'cover', display: 'block' }} />
-                    <div style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: 800, color: '#6B1E3A', marginBottom: 4 }}>{game.title}</div>
-                      <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.6 }}>{game.desc}</div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+              {games.length === 0 ? (
+                <div style={{ border: '1px dashed #d8c5a8', borderRadius: 12, padding: '14px 16px', color: '#7A5563', background: '#fffdf9' }}>
+                  No games configured in database yet.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 14, marginTop: 14 }}>
+                  {games.map((game, i) => (
+                    <article key={`${game.title}-${i}`} style={{ border: '1px solid #ecdcc4', borderRadius: 14, background: '#fffdf9', overflow: 'hidden' }}>
+                      <img src={game.imageUrl} alt={game.title} style={{ width: '100%', height: 'clamp(180px, 33vw, 290px)', objectFit: 'cover', display: 'block' }} />
+                      <div style={{ padding: '12px 14px' }}>
+                        <div style={{ fontWeight: 800, color: '#6B1E3A', marginBottom: 4 }}>{game.title}</div>
+                        <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.6 }}>{game.desc}</div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -252,48 +227,56 @@ export default function HomePage() {
             <div>
               <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Wedding Card Designs</h2>
 
-              <div style={{ position: 'relative', overscrollBehavior: 'contain' }} onWheelCapture={handleWheel}>
-                <div style={{ overflow: 'hidden', borderRadius: 14, border: '1px solid #ead7be', background: '#f8efe1', overscrollBehavior: 'contain' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      width: `${cardDesigns.length * 100}%`,
-                      transform: `translateX(-${cardIndex * (100 / cardDesigns.length)}%)`,
-                      transition: 'transform 360ms ease',
-                    }}
-                  >
-                    {cardDesigns.map((card, i) => (
-                      <div key={`${card.canvaUrl}-${i}`} style={{ width: `${100 / cardDesigns.length}%`, padding: 12, flexShrink: 0 }}>
-                        <a href={card.canvaUrl} target="_blank" rel="noreferrer" title="Open design in Canva" style={{ display: 'block' }} onWheelCapture={handleWheel}>
-                          <img
-                            src={card.imageUrl}
-                            alt={`Wedding card design ${i + 1}`}
-                            style={{ width: '100%', height: 'min(78vh, 920px)', objectFit: 'contain', borderRadius: 12, background: '#fff', boxShadow: '0 10px 25px rgba(33,13,22,0.24)' }}
-                          />
-                        </a>
+              {cardDesigns.length === 0 ? (
+                <div style={{ border: '1px dashed #d8c5a8', borderRadius: 12, padding: '14px 16px', color: '#7A5563', background: '#fffdf9' }}>
+                  No card designs configured in database yet.
+                </div>
+              ) : (
+                <>
+                  <div style={{ position: 'relative', overscrollBehavior: 'contain' }} onWheelCapture={handleWheel}>
+                    <div style={{ overflow: 'hidden', borderRadius: 14, border: '1px solid #ead7be', background: '#f8efe1', overscrollBehavior: 'contain' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          width: `${cardDesigns.length * 100}%`,
+                          transform: `translateX(-${cardIndex * (100 / cardDesigns.length)}%)`,
+                          transition: 'transform 360ms ease',
+                        }}
+                      >
+                        {cardDesigns.map((card, i) => (
+                          <div key={`${card.canvaUrl}-${i}`} style={{ width: `${100 / cardDesigns.length}%`, padding: 12, flexShrink: 0 }}>
+                            <a href={card.canvaUrl} target="_blank" rel="noreferrer" title="Open design in Canva" style={{ display: 'block' }} onWheelCapture={handleWheel}>
+                              <img
+                                src={card.imageUrl}
+                                alt={`Wedding card design ${i + 1}`}
+                                style={{ width: '100%', height: 'min(78vh, 920px)', objectFit: 'contain', borderRadius: 12, background: '#fff', boxShadow: '0 10px 25px rgba(33,13,22,0.24)' }}
+                              />
+                            </a>
+                          </div>
+                        ))}
                       </div>
+                    </div>
+
+                    <button onClick={prevCard} aria-label="Previous card" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', borderRadius: 999, width: 38, height: 38, display: 'grid', placeItems: 'center', background: 'rgba(35,12,20,0.75)', color: '#fff' }}>
+                      <FiArrowLeft />
+                    </button>
+                    <button onClick={nextCard} aria-label="Next card" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', borderRadius: 999, width: 38, height: 38, display: 'grid', placeItems: 'center', background: 'rgba(35,12,20,0.75)', color: '#fff' }}>
+                      <FiArrowRight />
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 8 }}>
+                    {cardDesigns.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCardIndex(i)}
+                        aria-label={`Go to card ${i + 1}`}
+                        style={{ width: i === cardIndex ? 22 : 8, height: 8, borderRadius: 999, border: 'none', background: i === cardIndex ? '#6B1E3A' : '#ccb59d', transition: 'all 180ms ease' }}
+                      />
                     ))}
                   </div>
-                </div>
-
-                <button onClick={prevCard} aria-label="Previous card" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', borderRadius: 999, width: 38, height: 38, display: 'grid', placeItems: 'center', background: 'rgba(35,12,20,0.75)', color: '#fff' }}>
-                  <FiArrowLeft />
-                </button>
-                <button onClick={nextCard} aria-label="Next card" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', borderRadius: 999, width: 38, height: 38, display: 'grid', placeItems: 'center', background: 'rgba(35,12,20,0.75)', color: '#fff' }}>
-                  <FiArrowRight />
-                </button>
-              </div>
-
-              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 8 }}>
-                {cardDesigns.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCardIndex(i)}
-                    aria-label={`Go to card ${i + 1}`}
-                    style={{ width: i === cardIndex ? 22 : 8, height: 8, borderRadius: 999, border: 'none', background: i === cardIndex ? '#6B1E3A' : '#ccb59d', transition: 'all 180ms ease' }}
-                  />
-                ))}
-              </div>
+                </>
+              )}
             </div>
           )}
         </section>
