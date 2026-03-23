@@ -243,7 +243,6 @@ export default function AdminScraper() {
         <input
           type="number"
           min={1}
-          step={50}
           value={pageMin}
           onChange={(e) => setPageMin(Math.max(1, Number(e.target.value) || 1))}
           style={{ width:72, padding:'8px 10px', border:'1px solid #e0d5c5', borderRadius:7, fontSize:12 }}
@@ -252,7 +251,6 @@ export default function AdminScraper() {
         <input
           type="number"
           min={1}
-          step={50}
           value={pageMax}
           onChange={(e) => setPageMax(Math.max(1, Number(e.target.value) || 1))}
           style={{ width:72, padding:'8px 10px', border:'1px solid #e0d5c5', borderRadius:7, fontSize:12 }}
