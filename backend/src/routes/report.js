@@ -2,7 +2,7 @@
 const express = require('express');
 const { chromium } = require('playwright');
 const router  = express.Router();
-const { requireAuth, supabaseAdmin } = require('../middleware/authMiddleware');
+const { requireClient, supabaseAdmin } = require('../middleware/authMiddleware');
 const { generateBudgetXLSX } = require('../services/excelService');
 
 async function ensureWeddingAccess(weddingId, profile) {
@@ -16,8 +16,7 @@ async function ensureWeddingAccess(weddingId, profile) {
     return { ok: false, status: 404, error: 'Wedding not found.' };
   }
 
-  const isAdmin = profile.role === 'admin' || profile.role === 'super_admin';
-  if (!isAdmin && wedding.client_id !== profile.id) {
+  if (wedding.client_id !== profile.id) {
     return { ok: false, status: 403, error: 'Not authorised for this wedding.' };
   }
 
@@ -26,7 +25,7 @@ async function ensureWeddingAccess(weddingId, profile) {
 
 // ── XLSX Export ────────────────────────────────────────────────────────────
 // POST /api/report/xlsx
-router.post('/xlsx', requireAuth, async (req, res) => {
+router.post('/xlsx', requireClient, async (req, res) => {
   try {
     const { items = [], summary = {}, meta = {}, actuals = [] } = req.body;
     const buffer = await generateBudgetXLSX({ items, summary, meta, actuals });
@@ -38,7 +37,7 @@ router.post('/xlsx', requireAuth, async (req, res) => {
   }
 });
 // POST /api/report/pdf — generate PDF, return as buffer
-router.post('/pdf', requireAuth, async (req, res) => {
+router.post('/pdf', requireClient, async (req, res) => {
   try {
     // Generate HTML for PDF
     const { items, summary, meta, inputs } = req.body;
@@ -103,7 +102,7 @@ router.post('/pdf', requireAuth, async (req, res) => {
 
 // ── Budget Actuals (tracker) ───────────────────────────────────────────────
 // GET /api/report/actuals/:weddingId
-router.get('/actuals/:weddingId', requireAuth, async (req, res) => {
+router.get('/actuals/:weddingId', requireClient, async (req, res) => {
   const access = await ensureWeddingAccess(req.params.weddingId, req.profile);
   if (!access.ok) return res.status(access.status).json({ error: access.error });
 
@@ -117,7 +116,7 @@ router.get('/actuals/:weddingId', requireAuth, async (req, res) => {
 });
 
 // POST /api/report/actuals — log an actual spend
-router.post('/actuals', requireAuth, async (req, res) => {
+router.post('/actuals', requireClient, async (req, res) => {
   const { weddingId, estimateId, cost_head, line_item_label, estimated_min, estimated_max, actual_amount, vendor_name, invoice_reference, paid_date, notes } = req.body;
   if (!weddingId || !cost_head || !line_item_label) return res.status(400).json({ error: 'weddingId, cost_head, line_item_label required.' });
 
@@ -137,7 +136,7 @@ router.post('/actuals', requireAuth, async (req, res) => {
 });
 
 // PUT /api/report/actuals/:id
-router.put('/actuals/:id', requireAuth, async (req, res) => {
+router.put('/actuals/:id', requireClient, async (req, res) => {
   // Verify ownership before updating
   const { data: existing, error: fetchError } = await supabaseAdmin
     .from('budget_actuals')
@@ -145,7 +144,7 @@ router.put('/actuals/:id', requireAuth, async (req, res) => {
     .eq('id', req.params.id)
     .single();
   if (fetchError || !existing) return res.status(404).json({ error: 'Actual not found.' });
-  if (existing.weddings.client_id !== req.profile.id && req.profile.role !== 'admin' && req.profile.role !== 'super_admin') {
+  if (existing.weddings.client_id !== req.profile.id) {
     return res.status(403).json({ error: 'Not authorised to edit this record.' });
   }
 
@@ -159,7 +158,7 @@ router.put('/actuals/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/report/actuals/:id
-router.delete('/actuals/:id', requireAuth, async (req, res) => {
+router.delete('/actuals/:id', requireClient, async (req, res) => {
   // Verify ownership before deleting
   const { data: existing, error: fetchError } = await supabaseAdmin
     .from('budget_actuals')
@@ -167,7 +166,7 @@ router.delete('/actuals/:id', requireAuth, async (req, res) => {
     .eq('id', req.params.id)
     .single();
   if (fetchError || !existing) return res.status(404).json({ error: 'Actual not found.' });
-  if (existing.weddings.client_id !== req.profile.id && req.profile.role !== 'admin' && req.profile.role !== 'super_admin') {
+  if (existing.weddings.client_id !== req.profile.id) {
     return res.status(403).json({ error: 'Not authorised to delete this record.' });
   }
 
@@ -177,7 +176,7 @@ router.delete('/actuals/:id', requireAuth, async (req, res) => {
 });
 
 // GET /api/report/scenarios/:weddingId
-router.get('/scenarios/:weddingId', requireAuth, async (req, res) => {
+router.get('/scenarios/:weddingId', requireClient, async (req, res) => {
   const access = await ensureWeddingAccess(req.params.weddingId, req.profile);
   if (!access.ok) return res.status(access.status).json({ error: access.error });
 
@@ -191,7 +190,7 @@ router.get('/scenarios/:weddingId', requireAuth, async (req, res) => {
 });
 
 // POST /api/report/scenarios — save a scenario
-router.post('/scenarios', requireAuth, async (req, res) => {
+router.post('/scenarios', requireClient, async (req, res) => {
   const { weddingId, label, cityId, hotelTierId, estimateId, isBaseline = false, notes } = req.body;
   if (!weddingId || !label?.trim()) return res.status(400).json({ error: 'weddingId and label are required.' });
 
@@ -225,7 +224,7 @@ router.post('/scenarios', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/report/scenarios/:id
-router.delete('/scenarios/:id', requireAuth, async (req, res) => {
+router.delete('/scenarios/:id', requireClient, async (req, res) => {
   const { data: scenario, error: fetchErr } = await supabaseAdmin
     .from('scenarios')
     .select('id, wedding_id')

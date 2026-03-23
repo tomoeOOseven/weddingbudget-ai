@@ -84,4 +84,16 @@ async function requireSuperAdmin(req, res, next) {
   });
 }
 
-module.exports = { requireAuth, requireAdmin, requireSuperAdmin, supabaseAdmin };
+/**
+ * requireClient — ensures only client accounts can access client-only data routes.
+ */
+async function requireClient(req, res, next) {
+  await requireAuth(req, res, async () => {
+    if (req.profile?.role !== 'client') {
+      return res.status(403).json({ error: 'Client access required.' });
+    }
+    next();
+  });
+}
+
+module.exports = { requireAuth, requireAdmin, requireSuperAdmin, requireClient, supabaseAdmin };

@@ -1,6 +1,6 @@
 // App.jsx — client-facing wizard with auth + wedding selection
-import React, { useEffect, useState } from 'react';
-import { fetchReferenceData, fetchWedding, updateWedding } from './api.js';
+import React, { useEffect, useRef, useState } from 'react';
+import { fetchReferenceData, fetchWedding, fetchWeddingState, updateWedding, updateWeddingState } from './api.js';
 import { useBudget, normalizeBudgetInputs, serializeBudgetInputs } from './useBudget.js';
 import { LiveTicker, StepNav, NavBar } from './components/LiveTicker.jsx';
 import Step1EventDetails  from './components/Step1EventDetails.jsx';
@@ -17,8 +17,6 @@ import { FiAlertTriangle, FiLoader } from 'react-icons/fi';
 
 const ACTIVE_WEDDING_KEY = 'wdtch_active_wedding_id';
 const ACTIVE_WEDDING_CACHE_KEY = 'wdtch_active_wedding_cache';
-const WEDDING_STATE_PREFIX = 'wdtch_wedding_state_';
-const WEDDING_STEP_PREFIX = 'wdtch_wedding_step_';
 const GUEST_STEP_KEY = 'wdtch_guest_step';
 
 function normalizeStep(value) {
@@ -28,13 +26,9 @@ function normalizeStep(value) {
   return clamped;
 }
 
-function getStepStorageKey(weddingId) {
-  return weddingId ? `${WEDDING_STEP_PREFIX}${weddingId}` : GUEST_STEP_KEY;
-}
-
-function getStoredStep(weddingId) {
+function getStoredGuestStep() {
   try {
-    return normalizeStep(localStorage.getItem(getStepStorageKey(weddingId)));
+    return normalizeStep(localStorage.getItem(GUEST_STEP_KEY));
   } catch {
     return 1;
   }
@@ -62,16 +56,6 @@ function getCachedActiveWedding(expectedId) {
   }
 }
 
-function parseWeddingNotes(notes) {
-  if (!notes || typeof notes !== 'string') return null;
-  try {
-    const parsed = JSON.parse(notes);
-    return parsed?.wizardInputs ?? null;
-  } catch {
-    return null;
-  }
-}
-
 function getQueryWeddingId() {
   const params = new URLSearchParams(window.location.search);
   return params.get('wid');
@@ -94,7 +78,9 @@ export default function App() {
   // Null = show dashboard, object = active wedding (or {} for guest mode)
   const [activeWedding, setActiveWedding] = useState(null);
   const [hydratingWedding, setHydratingWedding] = useState(false);
+  const [hydratingWizardState, setHydratingWizardState] = useState(false);
   const [weddingHydrationDone, setWeddingHydrationDone] = useState(false);
+  const forceStepOneWeddingIdRef = useRef(null);
 
   useEffect(() => {
     fetchReferenceData()
@@ -116,11 +102,13 @@ export default function App() {
       localStorage.setItem(ACTIVE_WEDDING_KEY, wedding.id);
       setQueryWeddingId(wedding.id);
       cacheActiveWedding(wedding);
-      setStep(getStoredStep(wedding.id));
+      // Opening from dashboard should always start from Event Details.
+      forceStepOneWeddingIdRef.current = wedding.id;
+      setStep(1);
     } else {
       localStorage.removeItem(ACTIVE_WEDDING_KEY);
       setQueryWeddingId(null);
-      setStep(getStoredStep(null));
+      setStep(getStoredGuestStep());
     }
     setActiveWedding(selected);
   };
@@ -137,6 +125,9 @@ export default function App() {
       return;
     }
 
+    const cached = getCachedActiveWedding(rememberedWeddingId);
+    if (cached) setActiveWedding(cached);
+
     setHydratingWedding(true);
     fetchWedding(rememberedWeddingId)
       .then((wedding) => {
@@ -144,7 +135,6 @@ export default function App() {
         cacheActiveWedding(wedding);
       })
       .catch(() => {
-        const cached = getCachedActiveWedding(rememberedWeddingId);
         if (cached) {
           setActiveWedding(cached);
           return;
@@ -175,31 +165,63 @@ export default function App() {
     setQueryWeddingId(weddingId);
     cacheActiveWedding(activeWedding);
 
-    const noteState = parseWeddingNotes(activeWedding.notes);
-    const localStateRaw = localStorage.getItem(`${WEDDING_STATE_PREFIX}${weddingId}`);
-    let localState = null;
-    if (localStateRaw) {
+    let cancelled = false;
+    setHydratingWizardState(true);
+
+    (async () => {
+      let state = null;
       try {
-        localState = JSON.parse(localStateRaw);
+        const resp = await fetchWeddingState(weddingId);
+        state = resp?.state ?? null;
       } catch {
-        localStorage.removeItem(`${WEDDING_STATE_PREFIX}${weddingId}`);
+        state = null;
       }
-    }
-    const merged = normalizeBudgetInputs({
-      ...noteState,
-      ...localState,
-      guests: activeWedding.total_guests ?? noteState?.guests ?? localState?.guests,
-      rooms: activeWedding.rooms_blocked ?? noteState?.rooms ?? localState?.rooms,
-      outstationPct: activeWedding.outstation_pct ?? noteState?.outstationPct ?? localState?.outstationPct,
+
+      if (cancelled) return;
+
+      const merged = normalizeBudgetInputs({
+        city: state?.city_slug ?? activeWedding?.cities?.slug,
+        hotelTier: state?.hotel_tier_slug ?? activeWedding?.hotel_tiers?.slug,
+        rooms: state?.rooms_blocked ?? activeWedding.rooms_blocked,
+        guests: state?.total_guests ?? activeWedding.total_guests,
+        outstationPct: state?.outstation_pct ?? activeWedding.outstation_pct,
+        functions: state?.function_ids,
+        selectedDecors: state?.selected_decor_ids,
+        selectedArtists: state?.selected_artist_ids,
+        selectedMeals: state?.selected_meal_ids,
+        barTier: state?.bar_tier_slug,
+        specialtyCounters: state?.specialty_counter_ids,
+        transfers: state?.transfers,
+        ghodi: state?.ghodi,
+        dholis: state?.dholis,
+        sfx: state?.sfx_ids,
+        roomBaskets: state?.room_baskets,
+        rituals: state?.rituals,
+        gifts: state?.gifts,
+        stationery: state?.stationery,
+        photography: state?.photography,
+      });
+
+      hydrateInputs(merged);
+
+      if (forceStepOneWeddingIdRef.current === weddingId) {
+        setStep(1);
+        forceStepOneWeddingIdRef.current = null;
+      } else {
+        setStep(normalizeStep(state?.step));
+      }
+    })().finally(() => {
+      if (!cancelled) setHydratingWizardState(false);
     });
 
-    hydrateInputs(merged);
-    setStep(getStoredStep(weddingId));
+    return () => {
+      cancelled = true;
+    };
   }, [user, activeWedding?.id, weddingHydrationDone]);
 
   useEffect(() => {
-    if (!weddingHydrationDone || activeWedding === null) return;
-    localStorage.setItem(getStepStorageKey(activeWedding?.id ?? null), String(normalizeStep(step)));
+    if (!weddingHydrationDone || activeWedding !== null) return;
+    localStorage.setItem(GUEST_STEP_KEY, String(normalizeStep(step)));
   }, [step, activeWedding?.id, activeWedding, weddingHydrationDone]);
 
   useEffect(() => {
@@ -207,11 +229,10 @@ export default function App() {
 
     const weddingId = activeWedding.id;
     const payload = serializeBudgetInputs(inputs);
-    localStorage.setItem(`${WEDDING_STATE_PREFIX}${weddingId}`, JSON.stringify(payload));
 
     const timer = setTimeout(() => {
+      updateWeddingState(weddingId, { ...payload, step: normalizeStep(step) }).catch(() => {});
       updateWedding(weddingId, {
-        notes: JSON.stringify({ wizardInputs: payload, savedAt: new Date().toISOString() }),
         total_guests: inputs.guests,
         rooms_blocked: inputs.rooms,
         outstation_pct: inputs.outstationPct,
@@ -219,7 +240,7 @@ export default function App() {
     }, 700);
 
     return () => clearTimeout(timer);
-  }, [user, activeWedding?.id, inputs]);
+  }, [user, activeWedding?.id, inputs, step]);
 
   // Auth loading
   if (authLoading) {
@@ -228,6 +249,10 @@ export default function App() {
 
   if (hydratingWedding) {
     return <Loader text="Restoring your wedding workspace…" />;
+  }
+
+  if (hydratingWizardState) {
+    return <Loader text="Restoring your customizations…" />;
   }
 
   if (user && isAdmin) {

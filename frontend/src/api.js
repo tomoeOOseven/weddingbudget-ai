@@ -38,6 +38,8 @@ export const fetchWeddings       = () => request('/api/weddings');
 export const createWedding       = (data) => request('/api/weddings', { method:'POST', body: JSON.stringify(data) });
 export const fetchWedding        = (id) => request(`/api/weddings/${id}`);
 export const updateWedding       = (id, data) => request(`/api/weddings/${id}`, { method:'PUT', body: JSON.stringify(data) });
+export const fetchWeddingState   = (id) => request(`/api/weddings/${id}/state`);
+export const updateWeddingState  = (id, data) => request(`/api/weddings/${id}/state`, { method:'PUT', body: JSON.stringify(data) });
 export const deleteWedding       = (id) => request(`/api/weddings/${id}`, { method:'DELETE' });
 export const fetchActuals        = (wid) => request(`/api/report/actuals/${wid}`);
 export const addActual           = (data) => request('/api/report/actuals', { method:'POST', body: JSON.stringify(data) });

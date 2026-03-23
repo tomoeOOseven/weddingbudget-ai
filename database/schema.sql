@@ -782,6 +782,33 @@ create table public.scenarios (
 
 create index idx_scenarios_wedding on public.scenarios (wedding_id);
 
+-- 8j. Wedding Wizard State (secure persisted customize state, no JSON blobs)
+create table public.wedding_wizard_state (
+  wedding_id               uuid primary key references public.weddings(id) on delete cascade,
+  step                     integer not null default 1 check (step between 1 and 7),
+  city_slug                text,
+  hotel_tier_slug          text,
+  rooms_blocked            integer,
+  total_guests             integer,
+  outstation_pct           numeric(5,2),
+  function_ids             text[] not null default '{}',
+  selected_decor_ids       uuid[] not null default '{}',
+  selected_artist_ids      uuid[] not null default '{}',
+  selected_meal_ids        text[] not null default '{}',
+  bar_tier_slug            text,
+  specialty_counter_ids    text[] not null default '{}',
+  transfers                boolean,
+  ghodi                    boolean,
+  dholis                   integer,
+  sfx_ids                  text[] not null default '{}',
+  room_baskets             boolean,
+  rituals                  boolean,
+  gifts                    boolean,
+  stationery               boolean,
+  photography              boolean,
+  updated_at               timestamptz not null default now()
+);
+
 
 -- ============================================================
 -- 9. ROW LEVEL SECURITY POLICIES
@@ -818,6 +845,7 @@ alter table public.logistics_selections   enable row level security;
 alter table public.budget_estimates       enable row level security;
 alter table public.budget_actuals         enable row level security;
 alter table public.scenarios              enable row level security;
+alter table public.wedding_wizard_state   enable row level security;
 
 -- ── Profiles ──────────────────────────────────────────────────
 create policy "profiles: own row"
@@ -885,10 +913,6 @@ create policy "weddings: client owns"
   on public.weddings for all
   using (client_id = auth.uid());
 
-create policy "weddings: admin reads all"
-  on public.weddings for select
-  using (public.is_admin());
-
 -- Helper: is this wedding_id owned by the current client?
 create or replace function public.owns_wedding(wid uuid)
 returns boolean language sql stable security definer as $$
@@ -942,19 +966,9 @@ create policy "scenarios: client owns"
   on public.scenarios for all
   using (public.owns_wedding(wedding_id));
 
--- Admins can read all client data
-do $$ declare t text;
-begin
-  foreach t in array array[
-    'wedding_functions','decor_selections','artist_bookings',
-    'fb_selections','logistics_selections','budget_estimates',
-    'budget_actuals','scenarios'
-  ] loop
-    execute format('
-      create policy %I on public.%I for select using (public.is_admin());
-    ', t||'_admin_read', t);
-  end loop;
-end $$;
+create policy "wedding_wizard_state: client owns via wedding"
+  on public.wedding_wizard_state for all
+  using (public.owns_wedding(wedding_id));
 
 
 -- ============================================================

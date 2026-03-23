@@ -130,15 +130,34 @@ export default function AdminScraper() {
     finally { setLoading(false); }
   }, []);
 
+  const loadLiveStats = useCallback(async () => {
+    try {
+      const [jobData, statsData] = await Promise.all([
+        apiFetch('/api/scraper/jobs?limit=10'),
+        apiFetch('/api/scraper/stats'),
+      ]);
+      setJobs(jobData.jobs ?? []);
+      setStats(statsData);
+    } catch {
+      // keep last successful numbers if polling fails
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
 
-  // Poll while jobs are running
+  // Poll numbers/jobs continuously without reloading the whole page.
   useEffect(() => {
-    const hasRunning = jobs.some(j => j.status === 'running') || Object.values(running).some(Boolean);
-    if (!hasRunning) return;
-    const id = setInterval(load, 5000);
+    const id = setInterval(() => {
+      if (!document.hidden) loadLiveStats();
+    }, 5000);
+
+    function onVisibilityChange() {
+      if (!document.hidden) loadLiveStats();
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => clearInterval(id);
-  }, [jobs, running, load]);
+  }, [loadLiveStats]);
 
   async function runScrape(sourceId, sourceName) {
     setRunning(r => ({ ...r, [sourceId]: true }));
@@ -146,7 +165,7 @@ export default function AdminScraper() {
     try {
       const data = await apiFetch('/api/scraper/run', { method:'POST', body: JSON.stringify({ sourceId }) });
       setMsg(`Scrape started for ${sourceName}`);
-      setTimeout(load, 1000);
+      setTimeout(loadLiveStats, 1000);
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setRunning(r => ({ ...r, [sourceId]: false })); }
   }
@@ -157,7 +176,7 @@ export default function AdminScraper() {
     try {
       await apiFetch('/api/scraper/run', { method:'POST', body: JSON.stringify({ all: true }) });
       setMsg('All-source scrape started in background');
-      setTimeout(load, 1000);
+      setTimeout(loadLiveStats, 1000);
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setRunning(r => ({ ...r, __ALL__: false })); }
   }
