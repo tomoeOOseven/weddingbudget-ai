@@ -6,15 +6,6 @@ import { FiCpu, FiImage } from 'react-icons/fi';
 const HF_SPACE_BASE = 'https://gamerquant-wedding-decor-price.hf.space';
 const HF_GRADIO_RUN_PREDICT = `${HF_SPACE_BASE}/gradio_api/run/predict`;
 
-function toDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
 function domainFromUrl(rawUrl) {
   try {
     return new URL(String(rawUrl || '')).hostname.replace(/^www\./i, '');
@@ -115,19 +106,30 @@ export default function AdminInference() {
     setMessage('');
 
     try {
-      const imgRes = await fetch(selected.imageUrl);
-      if (!imgRes.ok) throw new Error(`Failed to fetch image (${imgRes.status})`);
-      const base64Image = await toDataUrl(await imgRes.blob());
-
       const listingUrl = selected.source_url || selected.listing_url || selected.image_url || '';
       const sourceDomain = domainFromUrl(listingUrl || selected.imageUrl);
+      const imageUrl = selected.imageUrl;
+      const imageName = (() => {
+        try {
+          const pathname = new URL(imageUrl).pathname;
+          const fileName = pathname.split('/').pop();
+          return fileName || 'image.jpg';
+        } catch {
+          return 'image.jpg';
+        }
+      })();
 
       const payload = {
         data: [
-          base64Image,
-          selected.title || 'Scraped Image',
-          sourceDomain,
-          listingUrl,
+          {
+            path: imageUrl,
+            meta: { _type: 'gradio.FileData' },
+            orig_name: imageName,
+            url: imageUrl,
+          },
+          selected.title || 'test decor',
+          sourceDomain || 'wedmegood.com',
+          '',
         ],
       };
 
