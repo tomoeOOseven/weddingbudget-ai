@@ -1,6 +1,6 @@
 // App.jsx — client-facing wizard with auth + wedding selection
 import React, { useEffect, useRef, useState } from 'react';
-import { fetchReferenceData, fetchWedding, fetchWeddingState, updateWedding, updateWeddingState } from './api.js';
+import { calculateEstimate, fetchReferenceData, fetchWedding, fetchWeddingState, updateWedding, updateWeddingState } from './api.js';
 import { useBudget, normalizeBudgetInputs, serializeBudgetInputs } from './useBudget.js';
 import { LiveTicker, StepNav, NavBar } from './components/LiveTicker.jsx';
 import Step1EventDetails  from './components/Step1EventDetails.jsx';
@@ -13,11 +13,7 @@ import Step7Report        from './components/Step7Report.jsx';
 import { useAuth }        from './context/AuthContext.jsx';
 import WeddingDashboard   from './pages/WeddingDashboard.jsx';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { FiAlertTriangle, FiLoader } from 'react-icons/fi';
-
-const ACTIVE_WEDDING_KEY = 'wdtch_active_wedding_id';
-const ACTIVE_WEDDING_CACHE_KEY = 'wdtch_active_wedding_cache';
-const GUEST_STEP_KEY = 'wdtch_guest_step';
+import { FiLoader } from 'react-icons/fi';
 
 function normalizeStep(value) {
   const n = Number(value);
@@ -26,35 +22,6 @@ function normalizeStep(value) {
   return clamped;
 }
 
-function getStoredGuestStep() {
-  try {
-    return normalizeStep(localStorage.getItem(GUEST_STEP_KEY));
-  } catch {
-    return 1;
-  }
-}
-
-function cacheActiveWedding(wedding) {
-  if (!wedding?.id) return;
-  try {
-    localStorage.setItem(ACTIVE_WEDDING_CACHE_KEY, JSON.stringify({ id: wedding.id, name: wedding.name ?? 'Wedding Project' }));
-  } catch {
-    // ignore storage exceptions
-  }
-}
-
-function getCachedActiveWedding(expectedId) {
-  try {
-    const raw = localStorage.getItem(ACTIVE_WEDDING_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.id) return null;
-    if (expectedId && parsed.id !== expectedId) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 function getQueryWeddingId() {
   const params = new URLSearchParams(window.location.search);
@@ -74,7 +41,7 @@ export default function App() {
   const navigate = useNavigate();
   const [refData, setRefData]   = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
-  const [apiError, setApiError] = useState(false);
+  const [currentEstimateId, setCurrentEstimateId] = useState(null);
   // Null = show dashboard, object = active wedding (or {} for guest mode)
   const [activeWedding, setActiveWedding] = useState(null);
   const [hydratingWedding, setHydratingWedding] = useState(false);
@@ -85,13 +52,7 @@ export default function App() {
   useEffect(() => {
     fetchReferenceData()
       .then(d => { setRefData(d); setDataLoading(false); })
-      .catch(() => {
-        import('./fallbackData.js').then(m => {
-          setRefData(m.default);
-          setApiError(true);
-          setDataLoading(false);
-        });
-      });
+      .catch(() => { setDataLoading(false); });
   }, []);
 
   const { inputs, set, toggle, hydrateInputs, resetInputs, step, setStep, budget, cm, hd } = useBudget(refData);
@@ -99,16 +60,14 @@ export default function App() {
   const handleSelectWedding = (wedding) => {
     const selected = wedding ?? {};
     if (wedding?.id) {
-      localStorage.setItem(ACTIVE_WEDDING_KEY, wedding.id);
       setQueryWeddingId(wedding.id);
-      cacheActiveWedding(wedding);
       // Opening from dashboard should always start from Event Details.
       forceStepOneWeddingIdRef.current = wedding.id;
       setStep(1);
     } else {
-      localStorage.removeItem(ACTIVE_WEDDING_KEY);
       setQueryWeddingId(null);
-      setStep(getStoredGuestStep());
+      setStep(1);
+      setCurrentEstimateId(null);
     }
     setActiveWedding(selected);
   };
@@ -119,28 +78,20 @@ export default function App() {
       return;
     }
 
-    const rememberedWeddingId = getQueryWeddingId() || localStorage.getItem(ACTIVE_WEDDING_KEY);
+    const rememberedWeddingId = getQueryWeddingId();
     if (!rememberedWeddingId) {
       setWeddingHydrationDone(true);
       return;
     }
 
-    const cached = getCachedActiveWedding(rememberedWeddingId);
-    if (cached) setActiveWedding(cached);
-
     setHydratingWedding(true);
     fetchWedding(rememberedWeddingId)
       .then((wedding) => {
         setActiveWedding(wedding);
-        cacheActiveWedding(wedding);
       })
       .catch(() => {
-        if (cached) {
-          setActiveWedding(cached);
-          return;
-        }
-        localStorage.removeItem(ACTIVE_WEDDING_KEY);
         setQueryWeddingId(null);
+        setActiveWedding(null);
       })
       .finally(() => {
         setHydratingWedding(false);
@@ -153,17 +104,15 @@ export default function App() {
 
     const weddingId = activeWedding?.id;
     if (!weddingId) {
-      localStorage.removeItem(ACTIVE_WEDDING_KEY);
       setQueryWeddingId(null);
+      setCurrentEstimateId(null);
       if (activeWedding === null) {
         resetInputs();
       }
       return;
     }
 
-    localStorage.setItem(ACTIVE_WEDDING_KEY, weddingId);
     setQueryWeddingId(weddingId);
-    cacheActiveWedding(activeWedding);
 
     let cancelled = false;
     setHydratingWizardState(true);
@@ -221,8 +170,12 @@ export default function App() {
 
   useEffect(() => {
     if (!weddingHydrationDone || activeWedding !== null) return;
-    localStorage.setItem(GUEST_STEP_KEY, String(normalizeStep(step)));
+    if (step !== 1) setStep(1);
   }, [step, activeWedding?.id, activeWedding, weddingHydrationDone]);
+
+  useEffect(() => {
+    setCurrentEstimateId(null);
+  }, [activeWedding?.id]);
 
   useEffect(() => {
     if (!user || !activeWedding?.id) return;
@@ -241,6 +194,21 @@ export default function App() {
 
     return () => clearTimeout(timer);
   }, [user, activeWedding?.id, inputs, step]);
+
+  useEffect(() => {
+    if (!user || !activeWedding?.id || hydratingWizardState) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const data = await calculateEstimate({ ...inputs, weddingId: activeWedding.id });
+        setCurrentEstimateId(data?.currentEstimateId ?? null);
+      } catch {
+        // Non-blocking: UI remains usable if persistence fails.
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [user, activeWedding?.id, inputs, hydratingWizardState]);
 
   // Auth loading
   if (authLoading) {
@@ -266,8 +234,9 @@ export default function App() {
 
   // Data loading
   if (dataLoading) return <Loader text="Loading reference data…" />;
+  if (!refData) return <Loader text="Backend unavailable. Please start API service." />;
 
-  const stepProps = { inputs, set, toggle, refData, cm, hd, budget, setStep, weddingId: activeWedding?.id };
+  const stepProps = { inputs, set, toggle, refData, cm, hd, budget, setStep, weddingId: activeWedding?.id, estimateId: currentEstimateId };
 
   const STEPS = [
     <Step1EventDetails key={1} {...stepProps} />,
@@ -313,17 +282,11 @@ export default function App() {
           <div style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:8, padding:'10px 16px' }}>
             <div style={{ fontSize:10, fontWeight:600, letterSpacing:'1px', textTransform:'uppercase', color:'rgba(232,201,122,0.65)' }}>Live Estimate</div>
             <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, fontWeight:700, color:'#E8C97A' }}>
-              {budget.tMin >= 100000 ? `₹${(budget.tMin/100000).toFixed(1)}L` : '—'} — {budget.tMid >= 100000 ? `₹${(budget.tMid/100000).toFixed(1)}L` : '—'}
+              {budget.tMin >= 100000 ? `₹${(budget.tMin/100000).toFixed(1)}L` : '—'} — {budget.tMax >= 100000 ? `₹${(budget.tMax/100000).toFixed(1)}L` : '—'}
             </div>
           </div>
         </div>
       </div>
-
-      {apiError && (
-        <div style={{ background:'#FFF3CD', borderBottom:'1px solid #FDEEBA', padding:'8px 28px', fontSize:12, color:'#856404' }}>
-          <span style={{ display:'inline-flex', gap:6, alignItems:'center' }}><FiAlertTriangle /> Backend not detected - running with bundled fallback data.</span>
-        </div>
-      )}
 
       <StepNav step={step} setStep={setStep} />
 

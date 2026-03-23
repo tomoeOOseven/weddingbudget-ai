@@ -144,7 +144,7 @@ class JobLogger {
  * @param {string|null} triggeredBy — Admin user UUID, or null if cron
  * @returns {object}             — { jobId, saved, duped, failed }
  */
-async function runScrapeJob(source, triggeredBy = null) {
+async function runScrapeJob(source, triggeredBy = null, runOptions = {}) {
   // ── 1. Create job record ──────────────────────────────────────────────
   const { data: job, error: jobError } = await supabaseAdmin
     .from('scrape_jobs')
@@ -179,11 +179,13 @@ async function runScrapeJob(source, triggeredBy = null) {
   const defaultMaxPages = toIntOrNull(dbSelectors.maxPages) ?? codeConfig.maxPages ?? 2;
   const rawUrls = (source.url_patterns?.length > 0 ? source.url_patterns : null) ?? codeConfig.urls ?? [source.base_url];
   const pageParam = String(dbSelectors.pageParam || codeConfig.pageParam || 'page').trim() || 'page';
+  const effectivePageMin = toIntOrNull(runOptions.pageMin) ?? dbSelectors.pageMin;
+  const effectivePageMax = toIntOrNull(runOptions.pageMax) ?? dbSelectors.pageMax;
   const { urls: resolvedUrls, didExpand, range } = buildSeedUrls(
     rawUrls,
     pageParam,
-    dbSelectors.pageMin,
-    dbSelectors.pageMax,
+    effectivePageMin,
+    effectivePageMax,
     defaultMaxPages
   );
 
@@ -292,7 +294,7 @@ async function runScrapeJob(source, triggeredBy = null) {
  * @param {string|null} triggeredBy — Admin UUID or null for cron
  * @param {Function}    onJobDone   — Callback after each source completes
  */
-async function runAllSources(triggeredBy = null, onJobDone = () => {}) {
+async function runAllSources(triggeredBy = null, onJobDone = () => {}, runOptions = {}) {
   const { data: sources, error } = await supabaseAdmin
     .from('scrape_sources')
     .select('*')
@@ -310,7 +312,7 @@ async function runAllSources(triggeredBy = null, onJobDone = () => {}) {
   for (const source of sources) {
     console.log(`\n[scraperRunner] ── ${source.name} ──`);
     try {
-      const result = await runScrapeJob(source, triggeredBy);
+      const result = await runScrapeJob(source, triggeredBy, runOptions);
       totalSaved += result.saved;
       totalDuped += result.duped;
       jobs.push({ source: source.name, ...result });

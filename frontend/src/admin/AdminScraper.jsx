@@ -115,6 +115,8 @@ export default function AdminScraper() {
   const [viewJobId, setViewJobId] = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
   const [msg, setMsg]           = useState('');
+  const [pageMin, setPageMin]   = useState(1);
+  const [pageMax, setPageMax]   = useState(3);
 
   const load = useCallback(async () => {
     try {
@@ -163,7 +165,10 @@ export default function AdminScraper() {
     setRunning(r => ({ ...r, [sourceId]: true }));
     setMsg('');
     try {
-      const data = await apiFetch('/api/scraper/run', { method:'POST', body: JSON.stringify({ sourceId }) });
+      await apiFetch('/api/scraper/run', {
+        method:'POST',
+        body: JSON.stringify({ sourceId, pageMin: Number(pageMin), pageMax: Number(pageMax) }),
+      });
       setMsg(`Scrape started for ${sourceName}`);
       setTimeout(loadLiveStats, 1000);
     } catch (e) { setMsg(`Error: ${e.message}`); }
@@ -174,7 +179,10 @@ export default function AdminScraper() {
     setRunning(r => ({ ...r, __ALL__: true }));
     setMsg('');
     try {
-      await apiFetch('/api/scraper/run', { method:'POST', body: JSON.stringify({ all: true }) });
+      await apiFetch('/api/scraper/run', {
+        method:'POST',
+        body: JSON.stringify({ all: true, pageMin: Number(pageMin), pageMax: Number(pageMax) }),
+      });
       setMsg('All-source scrape started in background');
       setTimeout(loadLiveStats, 1000);
     } catch (e) { setMsg(`Error: ${e.message}`); }
@@ -231,6 +239,22 @@ export default function AdminScraper() {
 
       {/* Controls */}
       <div style={{ display:'flex', gap:10, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
+        <label style={{ fontSize:12, color:'#666' }}>Pages</label>
+        <input
+          type="number"
+          min={1}
+          value={pageMin}
+          onChange={(e) => setPageMin(Math.max(1, Number(e.target.value) || 1))}
+          style={{ width:72, padding:'8px 10px', border:'1px solid #e0d5c5', borderRadius:7, fontSize:12 }}
+        />
+        <span style={{ fontSize:12, color:'#666' }}>to</span>
+        <input
+          type="number"
+          min={1}
+          value={pageMax}
+          onChange={(e) => setPageMax(Math.max(1, Number(e.target.value) || 1))}
+          style={{ width:72, padding:'8px 10px', border:'1px solid #e0d5c5', borderRadius:7, fontSize:12 }}
+        />
         <button onClick={runAll} disabled={running.__ALL__}
           style={{ padding:'10px 20px', background: running.__ALL__ ? '#eee' : '#1a0a0a', border:'none', borderRadius:8, color: running.__ALL__ ? '#aaa' : '#E8C97A', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
           {running.__ALL__ ? 'Running All...' : 'Run All Sources'}

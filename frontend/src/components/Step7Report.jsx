@@ -1,7 +1,7 @@
 // Step7Report.jsx — full report with export, scenarios, and actuals tracker
 import React, { useState, useEffect } from 'react';
 import { BtnPrimary, BtnOutline, CAT_COLORS, fmt } from './ui.jsx';
-import { downloadPDF, downloadXLSX, fetchActuals, addActual, updateActual, deleteActual, fetchScenarios, saveScenario, deleteScenario, calculateEstimate } from '../api.js';
+import { downloadPDF, downloadXLSX, fetchActuals, addActual, updateActual, deleteActual, fetchScenarios, saveScenario, deleteScenario } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { FiBarChart2, FiDownload, FiFileText, FiX } from 'react-icons/fi';
 
@@ -258,30 +258,9 @@ function BudgetTracker({ weddingId, estimatedItems }) {
 }
 
 // ── Main Report ───────────────────────────────────────────────────────────────
-export default function Step7Report({ budget, inputs, setStep, weddingId }) {
+export default function Step7Report({ budget, inputs, setStep, weddingId, estimateId }) {
   const { items, tMin, tMax, tMid } = budget;
   const { user } = useAuth();
-  const [estimateId, setEstimateId] = useState(null);
-
-  useEffect(() => {
-    if (!user || !weddingId) {
-      setEstimateId(null);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      try {
-        const data = await calculateEstimate({ ...inputs, weddingId });
-        if (data?.currentEstimateId) {
-          setEstimateId(data.currentEstimateId);
-        }
-      } catch {
-        // Non-blocking: local estimate UI remains usable even if save fails.
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [user, weddingId, inputs]);
 
   return (
     <div>

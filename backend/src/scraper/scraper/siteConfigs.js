@@ -115,7 +115,6 @@ const SITE_CONFIGS = {
     scraper: 'playwright',
     urls: [
       'https://www.wedmegood.com/vendors/all/wedding-decorators/',
-      'https://www.wedmegood.com/photos/wedding-decoration-ideas',
     ],
     maxPages: 3,
     imageSelector: 'img',

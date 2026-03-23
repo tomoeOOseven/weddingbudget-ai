@@ -22,11 +22,15 @@ const { runScrapeJob, runAllSources } = require('../scraper/scraper/scraperRunne
 const runningJobs = new Set(); // sourceId values currently being scraped
 
 // ── POST /api/scraper/run ──────────────────────────────────────────────────
-// Body: { sourceId?: string, all?: boolean }
+// Body: { sourceId?: string, all?: boolean, pageMin?: number, pageMax?: number }
 // Starts a scrape job in the background (non-blocking).
 router.post('/run', requireAdmin, async (req, res) => {
-  const { sourceId, all } = req.body;
+  const { sourceId, all, pageMin, pageMax } = req.body;
   const triggeredBy = req.profile.id;
+  const runOptions = {
+    pageMin: Number.isInteger(Number(pageMin)) ? Number(pageMin) : null,
+    pageMax: Number.isInteger(Number(pageMax)) ? Number(pageMax) : null,
+  };
 
   if (!sourceId && !all) {
     return res.status(400).json({ error: 'Provide sourceId or all: true' });
@@ -43,7 +47,7 @@ router.post('/run', requireAdmin, async (req, res) => {
       res.json({ message: 'All-source scrape run started in background.', running: true });
 
       // Run async — don't await
-      runAllSources(triggeredBy)
+      runAllSources(triggeredBy, () => {}, runOptions)
         .catch(err => console.error('[scraper:all] Error:', err.message))
         .finally(() => runningJobs.delete('__ALL__'));
 
@@ -69,7 +73,7 @@ router.post('/run', requireAdmin, async (req, res) => {
       res.json({ message: `Scrape started for ${source.name}.`, running: true, source: source.name });
 
       // Run async
-      runScrapeJob(source, triggeredBy)
+      runScrapeJob(source, triggeredBy, runOptions)
         .catch(err => console.error(`[scraper:${source.name}] Error:`, err.message))
         .finally(() => runningJobs.delete(sourceId));
     }
