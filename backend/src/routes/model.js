@@ -9,7 +9,7 @@ router.get('/status', requireAdmin, async (req, res) => {
   const [mlHealth, { data: versions }] = await Promise.all([
     checkHealth(),
     supabaseAdmin.from('model_versions')
-      .select('id, version_label, status, training_set_size, mae_min, mae_max, r2_min, r2_max, trained_at, is_active')
+      .select('id, version_label, status, training_set_size, accuracy, precision, recall, f1_score, trained_at, is_active')
       .order('trained_at', { ascending: false }).limit(10),
   ]);
   res.json({ versions: versions ?? [], mlHealth });
@@ -17,7 +17,7 @@ router.get('/status', requireAdmin, async (req, res) => {
 
 // POST /api/model/train
 router.post('/train', requireAdmin, async (req, res) => {
-  const { versionLabel, forceBestModel, forceAlgorithm } = req.body;
+  const { versionLabel, forceBestModel, forceAlgorithm, includeScrapedDirect } = req.body;
   if (!versionLabel?.trim()) return res.status(400).json({ error: 'versionLabel is required.' });
   if (forceBestModel !== undefined && typeof forceBestModel !== 'boolean') {
     return res.status(400).json({ error: 'forceBestModel must be a boolean when provided.' });
@@ -25,9 +25,18 @@ router.post('/train', requireAdmin, async (req, res) => {
   if (forceAlgorithm !== undefined && typeof forceAlgorithm !== 'string') {
     return res.status(400).json({ error: 'forceAlgorithm must be a string when provided.' });
   }
+  if (includeScrapedDirect !== undefined && typeof includeScrapedDirect !== 'boolean') {
+    return res.status(400).json({ error: 'includeScrapedDirect must be a boolean when provided.' });
+  }
 
   try {
-    const data = await triggerTraining(versionLabel.trim(), req.profile.id, forceBestModel ?? null, forceAlgorithm?.trim()?.toLowerCase() || null);
+    const data = await triggerTraining(
+      versionLabel.trim(),
+      req.profile.id,
+      forceBestModel ?? null,
+      forceAlgorithm?.trim()?.toLowerCase() || null,
+      includeScrapedDirect ?? false,
+    );
     if (data === null) return res.status(503).json({ error: 'ML service is unavailable. Start the ml_service and try again.' });
     res.json(data);
   } catch (err) {
@@ -54,7 +63,7 @@ router.post('/promote/:id', requireAdmin, async (req, res) => {
 
   const { data: versions, error: listErr } = await supabaseAdmin
     .from('model_versions')
-    .select('id, version_label, status, training_set_size, mae_min, mae_max, r2_min, r2_max, trained_at, is_active')
+    .select('id, version_label, status, training_set_size, accuracy, precision, recall, f1_score, trained_at, is_active')
     .order('trained_at', { ascending: false })
     .limit(10);
   if (listErr) return res.status(500).json({ error: listErr.message });

@@ -111,8 +111,9 @@ async function embedImage(imageId, imageUrl, storagePath = null) {
  * @param {string} triggeredBy   — admin profile UUID
  * @param {boolean|null} forceBestModel — promote best learned model even if it does not beat rule-based
  * @param {string|null} forceAlgorithm — force one algorithm name for this run
+ * @param {boolean} includeScrapedDirect — include directly scraped priced images in training
  */
-async function triggerTraining(versionLabel, triggeredBy = null, forceBestModel = null, forceAlgorithm = null) {
+async function triggerTraining(versionLabel, triggeredBy = null, forceBestModel = null, forceAlgorithm = null, includeScrapedDirect = false) {
   if (!ML_PIPELINE_ENABLED) {
     return null;
   }
@@ -123,6 +124,7 @@ async function triggerTraining(versionLabel, triggeredBy = null, forceBestModel 
       triggered_by:  triggeredBy,
       force_best_model: forceBestModel,
       force_algorithm: forceAlgorithm,
+      include_scraped_direct: includeScrapedDirect,
     }, { timeout: 10000 });
     return data;
   } catch (err) {

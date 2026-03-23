@@ -67,7 +67,10 @@ export default function AdminModel() {
   const [training, setTraining]     = useState(false);
   const [promotingId, setPromotingId] = useState(null);
   const [trainMsg, setTrainMsg]     = useState('');
+  const [includeScrapedDirect, setIncludeScrapedDirect] = useState(false);
   const [pollInterval, setPollInterval] = useState(null);
+  const labelledTrainingReady = (trainingStats?.inTraining ?? 0) >= 20;
+  const canStartTrain = Boolean(versionLabel.trim()) && !training && (includeScrapedDirect || labelledTrainingReady);
 
   const loadData = useCallback(async () => {
     try {
@@ -108,7 +111,10 @@ export default function AdminModel() {
     try {
       const data = await apiFetch('/api/model/train', {
         method: 'POST',
-        body: JSON.stringify({ versionLabel: versionLabel.trim() }),
+        body: JSON.stringify({
+          versionLabel: versionLabel.trim(),
+          includeScrapedDirect,
+        }),
       });
       setTrainMsg(`Training started - ${data.message}`);
       setVersionLabel('');
@@ -202,10 +208,10 @@ export default function AdminModel() {
         <div style={S.section}>
           <div style={S.sectionTitle}>Active Model — {activeVersion.version_label}</div>
           <div style={{ display:'flex', gap:14, flexWrap:'wrap' }}>
-            <MetricCard label="R² (cost_min)"  value={activeVersion.r2_min ?? '—'}  color="#7a1c1c" />
-            <MetricCard label="R² (cost_max)"  value={activeVersion.r2_max ?? '—'}  color="#7a1c1c" />
-            <MetricCard label="MAE (min)"       value={activeVersion.mae_min ? `₹${Number(activeVersion.mae_min).toLocaleString('en-IN')}` : '—'} color="#b45309" sub="Mean absolute error" />
-            <MetricCard label="MAE (max)"       value={activeVersion.mae_max ? `₹${Number(activeVersion.mae_max).toLocaleString('en-IN')}` : '—'} color="#b45309" />
+            <MetricCard label="Accuracy" value={activeVersion.accuracy != null ? `${(Number(activeVersion.accuracy) * 100).toFixed(1)}%` : '—'} color="#7a1c1c" />
+            <MetricCard label="Precision" value={activeVersion.precision != null ? `${(Number(activeVersion.precision) * 100).toFixed(1)}%` : '—'} color="#7a1c1c" />
+            <MetricCard label="Recall" value={activeVersion.recall != null ? `${(Number(activeVersion.recall) * 100).toFixed(1)}%` : '—'} color="#b45309" />
+            <MetricCard label="F1 Score" value={activeVersion.f1_score != null ? `${(Number(activeVersion.f1_score) * 100).toFixed(1)}%` : '—'} color="#b45309" />
             <MetricCard label="Training Images" value={activeVersion.training_set_size ?? '—'} color="#15803d" sub="labelled images used" />
           </div>
         </div>
@@ -247,20 +253,31 @@ export default function AdminModel() {
             onChange={e => setVersionLabel(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleTrain()}
           />
+          <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#555' }}>
+            <input
+              type="checkbox"
+              checked={includeScrapedDirect}
+              onChange={(e) => setIncludeScrapedDirect(e.target.checked)}
+            />
+            Include directly scraped priced images
+          </label>
           <button
-            style={S.btn(training || !versionLabel.trim() || (trainingStats?.inTraining ?? 0) < 20)}
-            disabled={training || !versionLabel.trim() || (trainingStats?.inTraining ?? 0) < 20}
+            style={S.btn(!canStartTrain)}
+            disabled={!canStartTrain}
             onClick={handleTrain}
           >
             {training ? 'Starting…' : 'Train'}
           </button>
+        </div>
+        <div style={{ marginTop:8, fontSize:11, color:'#888' }}>
+          When enabled, training uses labelled dataset plus scraped images with extracted price seeds.
         </div>
         {trainMsg && (
           <div style={{ marginTop:12, fontSize:13, color: trainMsg.startsWith('Error') ? '#dc2626' : '#15803d' }}>
             {trainMsg}
           </div>
         )}
-        {(trainingStats?.inTraining ?? 0) < 20 && (
+        {!includeScrapedDirect && (trainingStats?.inTraining ?? 0) < 20 && (
           <div style={{ marginTop:10, fontSize:12, color:'#dc2626' }}>
             <FiAlertTriangle style={{ verticalAlign: 'middle' }} /> Need at least 20 images in the training set. Currently have {trainingStats?.inTraining ?? 0}.
           </div>
@@ -281,7 +298,7 @@ export default function AdminModel() {
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
               <thead>
                 <tr style={{ background:'#f9f5ef', borderBottom:'1px solid #f0e8e0' }}>
-                  {['Version','Status','R² min','R² max','MAE min','Images','Trained',''].map(h => (
+                  {['Version','Status','Accuracy','Precision','Recall','F1','Images','Trained',''].map(h => (
                     <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10,
                       letterSpacing:'1px', textTransform:'uppercase', color:'#888', fontWeight:600 }}>{h}</th>
                   ))}
@@ -296,9 +313,10 @@ export default function AdminModel() {
                         padding:'2px 6px', borderRadius:10 }}>ACTIVE</span>}
                     </td>
                     <td style={{ padding:'12px 16px' }}><StatusBadge status={v.status} /></td>
-                    <td style={{ padding:'12px 16px', color:'#7a1c1c', fontWeight:600 }}>{v.r2_min ?? '—'}</td>
-                    <td style={{ padding:'12px 16px', color:'#7a1c1c', fontWeight:600 }}>{v.r2_max ?? '—'}</td>
-                    <td style={{ padding:'12px 16px' }}>{v.mae_min ? `₹${Number(v.mae_min).toLocaleString('en-IN')}` : '—'}</td>
+                    <td style={{ padding:'12px 16px', color:'#7a1c1c', fontWeight:600 }}>{v.accuracy != null ? `${(Number(v.accuracy) * 100).toFixed(1)}%` : '—'}</td>
+                    <td style={{ padding:'12px 16px', color:'#7a1c1c', fontWeight:600 }}>{v.precision != null ? `${(Number(v.precision) * 100).toFixed(1)}%` : '—'}</td>
+                    <td style={{ padding:'12px 16px' }}>{v.recall != null ? `${(Number(v.recall) * 100).toFixed(1)}%` : '—'}</td>
+                    <td style={{ padding:'12px 16px' }}>{v.f1_score != null ? `${(Number(v.f1_score) * 100).toFixed(1)}%` : '—'}</td>
                     <td style={{ padding:'12px 16px' }}>{v.training_set_size ?? '—'}</td>
                     <td style={{ padding:'12px 16px', color:'#999', fontSize:12 }}>
                       {v.trained_at ? new Date(v.trained_at).toLocaleDateString('en-IN') : '—'}

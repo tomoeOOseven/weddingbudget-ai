@@ -32,6 +32,7 @@ from sklearn.linear_model     import Ridge, ElasticNet
 from sklearn.model_selection  import train_test_split
 from sklearn.model_selection  import RepeatedKFold, cross_val_score
 from sklearn.metrics          import mean_absolute_error, r2_score
+from sklearn.metrics          import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.preprocessing    import LabelEncoder
 
 # Optional — CLIP only loads if torch is available
@@ -99,6 +100,7 @@ class TrainRequest(BaseModel):
     triggered_by:  Optional[str] = None   # admin profile UUID
     force_best_model: Optional[bool] = None  # promote best learned model even if baseline wins
     force_algorithm: Optional[str] = None  # force one algorithm: ridge|elasticnet|gbm_shallow|rf_shallow|gbm|rf
+    include_scraped_direct: Optional[bool] = False  # include scraped_images with price seeds (even if unlabelled)
 
 class PredictRequest(BaseModel):
     image_id:      Optional[str] = None
@@ -270,12 +272,21 @@ async def train(req: TrainRequest, bg: BackgroundTasks):
             'selection_mode': 'data_size_adaptive',
             'force_best_model': force_best_model,
             'force_algorithm': force_algorithm,
+            'include_scraped_direct': bool(req.include_scraped_direct),
         },
         'log':              [],
     }).execute()
     run_id = run_resp.data[0]['id']
 
-    bg.add_task(_run_training, version_id, run_id, req.version_label, force_best_model, force_algorithm)
+    bg.add_task(
+        _run_training,
+        version_id,
+        run_id,
+        req.version_label,
+        force_best_model,
+        force_algorithm,
+        bool(req.include_scraped_direct),
+    )
 
     return { 'version_id': version_id, 'run_id': run_id, 'message': 'Training started in background.' }
 
@@ -288,7 +299,14 @@ def _append_log(run_id: str, line: str):
     log.info(f'[train:{run_id[:8]}] {line}')
 
 
-def _run_training(version_id: str, run_id: str, version_label: str, force_best_model: bool = False, force_algorithm: Optional[str] = None):
+def _run_training(
+    version_id: str,
+    run_id: str,
+    version_label: str,
+    force_best_model: bool = False,
+    force_algorithm: Optional[str] = None,
+    include_scraped_direct: bool = False,
+):
     """Full training pipeline — runs in background thread."""
     import time
     start = time.time()
@@ -301,14 +319,50 @@ def _run_training(version_id: str, run_id: str, version_label: str, force_best_m
             .select('image_id, function_type, style, complexity, cost_seed_min, cost_seed_max') \
             .eq('is_in_training', True).execute()
 
-        labels = labels_resp.data
-        if len(labels) < 10:
-            raise ValueError(f'Not enough labelled data: {len(labels)} rows (need >=10).')
+        labels = labels_resp.data or []
+        training_rows = list(labels)
+        labelled_ids = {row['image_id'] for row in labels}
 
-        _append_log(run_id, f'Loaded {len(labels)} labelled images.')
+        if include_scraped_direct:
+            _append_log(run_id, 'Including directly scraped priced images in training set…')
+            scraped_resp = supabase.table('scraped_images') \
+                .select('id, price_inr, price_text') \
+                .in_('status', ['raw', 'labelled']).execute()
+
+            scraped_rows = scraped_resp.data or []
+            appended = 0
+            for row in scraped_rows:
+                image_id = row.get('id')
+                if not image_id or image_id in labelled_ids:
+                    continue
+
+                price_seed = row.get('price_inr')
+                if price_seed is None:
+                    price_seed = _parse_price_seed(row.get('price_text'))
+                if price_seed is None:
+                    continue
+                if price_seed < 1000 or price_seed > 5000000:
+                    continue
+
+                training_rows.append({
+                    'image_id': image_id,
+                    'function_type': 'other',
+                    'style': 'Traditional',
+                    'complexity': 'medium',
+                    'cost_seed_min': int(round(price_seed * 0.9)),
+                    'cost_seed_max': int(round(price_seed * 1.1)),
+                })
+                appended += 1
+
+            _append_log(run_id, f'Added {appended} directly scraped priced images.')
+
+        if len(training_rows) < 10:
+            raise ValueError(f'Not enough training data: {len(training_rows)} rows (need >=10).')
+
+        _append_log(run_id, f'Loaded {len(labels)} labelled images, total training rows: {len(training_rows)}.')
 
         # Load embeddings for those images (may not exist for all)
-        image_ids    = [l['image_id'] for l in labels]
+        image_ids    = [l['image_id'] for l in training_rows]
         emb_resp     = supabase.table('image_embeddings') \
             .select('image_id, embedding').in_('image_id', image_ids).execute()
         emb_map = { e['image_id']: np.array(e['embedding'], dtype=np.float32) for e in emb_resp.data }
@@ -340,12 +394,12 @@ def _run_training(version_id: str, run_id: str, version_label: str, force_best_m
         elif missing_ids and not CLIP_AVAILABLE:
             _append_log(run_id, 'CLIP not available on server; training will use non-visual features for missing images.')
 
-        _append_log(run_id, f'Embeddings available for {len(emb_map)}/{len(labels)} images.')
+        _append_log(run_id, f'Embeddings available for {len(emb_map)}/{len(training_rows)} images.')
         use_clip_features = len(emb_map) > 0
 
         # Build feature matrix
         X, y_min, y_max = [], [], []
-        for row in labels:
+        for row in training_rows:
             emb = emb_map.get(row['image_id'])
             fv  = build_feature_vector(row, emb)
             X.append(fv)
@@ -361,7 +415,7 @@ def _run_training(version_id: str, run_id: str, version_label: str, force_best_m
         # Rule-based baseline (dataset-wide) for promotion gate.
         rb_preds_min = []
         rb_preds_max = []
-        for row in labels:
+        for row in training_rows:
             rb_min, rb_max, _, _ = _rule_based_estimate(row)
             rb_preds_min.append(rb_min)
             rb_preds_max.append(rb_max)
@@ -371,7 +425,7 @@ def _run_training(version_id: str, run_id: str, version_label: str, force_best_m
         rb_mae_avg = (rb_mae_min + rb_mae_max) / 2.0
         _append_log(run_id, f'Rule-based baseline MAE — min: {rb_mae_min:,.0f}, max: {rb_mae_max:,.0f}, avg: {rb_mae_avg:,.0f}')
 
-        sample_n = len(labels)
+        sample_n = len(training_rows)
         all_candidates = {
             'ridge': lambda: Ridge(alpha=1.0, random_state=42),
             'elasticnet': lambda: ElasticNet(alpha=0.05, l1_ratio=0.2, random_state=42, max_iter=10000),
@@ -457,7 +511,22 @@ def _run_training(version_id: str, run_id: str, version_label: str, force_best_m
         r2_min    = float(r2_score(ym_test, pred_min))
         r2_max    = float(r2_score(ymx_test, pred_max))
 
+        y_mid_all  = (y_min + y_max) / 2.0
+        q1, q2 = np.quantile(y_mid_all, [0.33, 0.66])
+
+        y_mid_true = (ym_test + ymx_test) / 2.0
+        y_mid_pred = (pred_min + pred_max) / 2.0
+
+        y_true_tier = np.digitize(y_mid_true, bins=[q1, q2])
+        y_pred_tier = np.digitize(y_mid_pred, bins=[q1, q2])
+
+        accuracy = float(accuracy_score(y_true_tier, y_pred_tier))
+        precision = float(precision_score(y_true_tier, y_pred_tier, average='weighted', zero_division=0))
+        recall = float(recall_score(y_true_tier, y_pred_tier, average='weighted', zero_division=0))
+        f1 = float(f1_score(y_true_tier, y_pred_tier, average='weighted', zero_division=0))
+
         _append_log(run_id, f'Eval — MAE min: ₹{mae_min:,.0f}, max: ₹{mae_max:,.0f} | R² min: {r2_min:.3f}, max: {r2_max:.3f}')
+        _append_log(run_id, f'Class Metrics — Acc: {accuracy:.3f}, Prec: {precision:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}')
 
         best_beats_rule = best_cv_mae_avg < rb_mae_avg
         should_promote = best_beats_rule or force_best_model
@@ -489,12 +558,16 @@ def _run_training(version_id: str, run_id: str, version_label: str, force_best_m
             'status':            'ready',
             'is_active':         should_promote,
             'algorithm':         best_name,
-            'training_set_size': len(labels),
+            'training_set_size': len(training_rows),
             'test_set_size':     len(X_test),
             'mae_min':           round(mae_min, 2),
             'mae_max':           round(mae_max, 2),
             'r2_min':            round(r2_min, 4),
             'r2_max':            round(r2_max, 4),
+            'accuracy':          round(accuracy, 4),
+            'precision':         round(precision, 4),
+            'recall':            round(recall, 4),
+            'f1_score':          round(f1, 4),
             'model_file_path':   f'{base_path}.joblib',
             'trained_at':        datetime.utcnow().isoformat(),
             'feature_cols':      ['clip_512' if use_clip_features else 'rule_based', 'function_type', 'style', 'complexity', 'city_mult', 'hotel_decor_mult'],
@@ -632,11 +705,44 @@ def _rule_based_estimate(row: dict):
 
     return c_min, c_max, 0.45, 'rule_based'
 
+
+def _parse_price_seed(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        n = int(round(float(value)))
+        return n if n > 0 else None
+
+    text = str(value).strip().lower().replace(',', '')
+    if not text:
+        return None
+
+    for bad in ('request', 'contact', 'call', 'onwards'):
+        if bad in text:
+            return None
+
+    import re
+
+    m = re.search(r'(\d+(?:\.\d+)?)', text)
+    if not m:
+        return None
+
+    num = float(m.group(1))
+    if 'crore' in text or re.search(r'\bcr\b', text):
+        num *= 10000000
+    elif 'lakh' in text or 'lac' in text:
+        num *= 100000
+    elif re.search(r'\bk\b', text):
+        num *= 1000
+
+    n = int(round(num))
+    return n if n > 0 else None
+
 # ── GET /model/status ─────────────────────────────────────────────────────────
 @app.get('/model/status')
 def model_status():
     resp = supabase.table('model_versions') \
-        .select('id, version_label, status, training_set_size, mae_min, mae_max, r2_min, r2_max, trained_at, is_active') \
+        .select('id, version_label, status, training_set_size, accuracy, precision, recall, f1_score, trained_at, is_active') \
         .order('trained_at', desc=True).limit(5).execute()
 
     return {

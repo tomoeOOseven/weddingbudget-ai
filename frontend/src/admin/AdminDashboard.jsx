@@ -76,7 +76,7 @@ export default function AdminDashboard() {
           supabase.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'labelled'),
           supabase.from('scraped_images').select('*', { count: 'exact', head: true }).eq('status', 'raw'),
           supabase.from('artists').select('*', { count: 'exact', head: true }),
-          supabase.from('model_versions').select('version_label, r2_min, r2_max, training_set_size, trained_at').eq('is_active', true).limit(1),
+          supabase.from('model_versions').select('version_label, accuracy, precision, recall, f1_score, training_set_size, trained_at').eq('is_active', true).limit(1),
           supabase.from('scrape_jobs').select('id, status, images_saved, created_at, scrape_sources(name)')
             .order('created_at', { ascending: false }).limit(5),
         ]);
@@ -115,7 +115,7 @@ export default function AdminDashboard() {
         <StatCard icon={<FiImage />} label="Total Scraped Images" value={loading ? '…' : stats.totalImages?.toLocaleString()} sub="across all sources" onClick={() => navigate('/admin/scraper')} />
         <StatCard icon={<FiTag />} label="Labelled Images" value={loading ? '…' : stats.labelledImages?.toLocaleString()} sub="ready for training" color="#15803d" onClick={() => navigate('/admin/labelling')} />
         <StatCard icon={<FiClock />} label="Pending Labels" value={loading ? '…' : stats.pendingLabels?.toLocaleString()} sub="awaiting review" color="#b45309" onClick={() => navigate('/admin/labelling')} />
-        <StatCard icon={<FiActivity />} label="Active Model" value={loading ? '…' : (stats.activeModel?.version_label ?? 'None')} sub={stats.activeModel ? `R² min ${stats.activeModel.r2_min ?? '—'} | R² max ${stats.activeModel.r2_max ?? '—'}` : 'No model trained yet'} onClick={() => navigate('/admin/model')} />
+        <StatCard icon={<FiActivity />} label="Active Model" value={loading ? '…' : (stats.activeModel?.version_label ?? 'None')} sub={stats.activeModel ? `Acc ${(Number(stats.activeModel.accuracy || 0) * 100).toFixed(1)}% | F1 ${(Number(stats.activeModel.f1_score || 0) * 100).toFixed(1)}%` : 'No model trained yet'} onClick={() => navigate('/admin/model')} />
       </div>
 
       {/* Quick actions + recent jobs */}
@@ -183,8 +183,10 @@ export default function AdminDashboard() {
           </h2>
           <div style={{ display: 'flex', gap: 32 }}>
             {[
-              { label: 'R² Score (cost_min)', value: stats.activeModel.r2_min ?? '—' },
-              { label: 'R² Score (cost_max)', value: stats.activeModel.r2_max ?? '—' },
+              { label: 'Accuracy', value: stats.activeModel.accuracy != null ? `${(Number(stats.activeModel.accuracy) * 100).toFixed(1)}%` : '—' },
+              { label: 'Precision', value: stats.activeModel.precision != null ? `${(Number(stats.activeModel.precision) * 100).toFixed(1)}%` : '—' },
+              { label: 'Recall', value: stats.activeModel.recall != null ? `${(Number(stats.activeModel.recall) * 100).toFixed(1)}%` : '—' },
+              { label: 'F1 Score', value: stats.activeModel.f1_score != null ? `${(Number(stats.activeModel.f1_score) * 100).toFixed(1)}%` : '—' },
               { label: 'Training Set', value: `${stats.activeModel.training_set_size ?? 0} images` },
               { label: 'Trained', value: stats.activeModel.trained_at ? new Date(stats.activeModel.trained_at).toLocaleDateString('en-IN') : '—' },
             ].map(m => (

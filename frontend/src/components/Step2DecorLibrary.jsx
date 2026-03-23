@@ -11,8 +11,35 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
   const [scoring, setScoring]         = useState(false);
 
   const decors  = refData?.decor ?? [];
+  const scrapedCount = decors.filter((d) => d.source === 'scraped').length;
   const funs    = refData?.functions ?? [];
   const fnLabel = Object.fromEntries(funs.map(f => [f.id, f.label]));
+
+  if (scrapedCount === 0) {
+    return (
+      <div>
+        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:32, fontWeight:600, color:'var(--maroon)', marginBottom:4 }}>
+          Decor Library
+        </div>
+        <div style={{ fontSize:14, color:'var(--muted)', marginBottom:20, fontWeight:300 }}>
+          Scraped decor library is currently empty.
+        </div>
+        <div style={{
+          background:'#fff', border:'2px dashed rgba(0,0,0,0.1)',
+          borderRadius:12, padding:'48px 32px', textAlign:'center',
+        }}>
+          <div style={{ fontSize:48, marginBottom:12 }}><FiImage /></div>
+          <div style={{ fontSize:16, fontWeight:600, color:'#333', marginBottom:8 }}>
+            Decor Library - Coming next
+          </div>
+          <div style={{ fontSize:13, color:'#999', maxWidth:420, margin:'0 auto', lineHeight:1.6 }}>
+            This module will be implemented in the next build step. The database schema and
+            API routes are ready - the UI just needs wiring up.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const styles  = ['All', ...new Set(decors.map(d => d.style).filter(Boolean))];
   const fnTabs  = ['All', ...funs.filter(f => inputs.functions.has(f.id)).map(f => f.label)];

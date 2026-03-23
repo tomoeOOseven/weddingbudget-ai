@@ -558,6 +558,10 @@ create table public.model_versions (
   mae_max             numeric(10,2),
   r2_min              numeric(5,4),                      -- R² score
   r2_max              numeric(5,4),
+  accuracy            numeric(5,4),                      -- weighted classification metrics on test tiers
+  precision           numeric(5,4),
+  recall              numeric(5,4),
+  f1_score            numeric(5,4),
   test_set_size       integer,
   -- Storage
   model_file_path     text,                              -- Supabase Storage path for .pkl/.joblib

@@ -18,6 +18,7 @@ const NAV = [
       { path: '/admin/scraper',  label: 'Scraper Control', icon: <FiTool /> },
       { path: '/admin/labelling',label: 'Labelling Queue', icon: <FiTag /> },
       { path: '/admin/model',    label: 'Model Training',  icon: <FiActivity /> },
+      { path: '/admin/inference',label: 'Model Inference', icon: <FiActivity /> },
     ],
   },
   {
