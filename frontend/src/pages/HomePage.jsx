@@ -68,7 +68,7 @@ function TabButton({ active, icon, label, onClick }) {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user, isAdmin, loading, signOut } = useAuth();
+  const { user, profile, isAdmin, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('problem');
   const [cardIndex, setCardIndex] = useState(0);
   const [cardDesigns, setCardDesigns] = useState(FALLBACK_CARD_DESIGNS);
@@ -155,6 +155,10 @@ export default function HomePage() {
             <span style={{ color: '#7A5563', fontSize: 12 }}>Checking session...</span>
           ) : user ? (
             isAdmin ? (
+              <button onClick={signOut} style={{ border: '1px solid #d6c4aa', background: '#fff', color: '#6B1E3A', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                Sign out
+              </button>
+            ) : !profile ? (
               <button onClick={signOut} style={{ border: '1px solid #d6c4aa', background: '#fff', color: '#6B1E3A', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
                 Sign out
               </button>
