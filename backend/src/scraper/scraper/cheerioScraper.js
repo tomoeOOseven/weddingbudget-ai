@@ -17,6 +17,31 @@ const BASE_HEADERS = {
   'DNT':             '1',
 };
 
+const PRICE_PATTERNS = [
+  /(?:₹|Rs\.?|INR)\s*([\d,]+)\s*(?:onwards|onward|starting|start|per\s*event|\/day|\/event)?/i,
+  /(?:starting\s*(?:at|from)|price\s*from|from)\s*(?:₹|Rs\.?|INR)?\s*([\d,]+)/i,
+  /([\d,]{4,})\s*(?:onwards|onward)/i,
+];
+
+function normalizeSpace(text = '') {
+  return String(text).replace(/\s+/g, ' ').trim();
+}
+
+function extractSeedPrice(text = '') {
+  const t = normalizeSpace(text);
+  if (!t) return null;
+  if (/price\s*on\s*request/i.test(t)) return 'Price on Request';
+
+  for (const pattern of PRICE_PATTERNS) {
+    const match = t.match(pattern);
+    if (match?.[1]) {
+      const digits = String(match[1]).replace(/[^\d]/g, '');
+      if (digits) return `Rs ${Number(digits)}`;
+    }
+  }
+  return null;
+}
+
 /**
  * Resolve a potentially relative URL against a base URL.
  */
@@ -57,16 +82,55 @@ function findNextPage($, currentUrl) {
     'a[rel="next"]',
     '.next a',
     '.pagination .next',
-    'a:contains("Next")',
-    'a:contains("→")',
     'a.next-page',
+    'a[aria-label*="next" i]',
   ];
+
   for (const sel of selectors) {
     const href = $(sel).first().attr('href');
     const resolved = resolveUrl(href, currentUrl);
     if (resolved && resolved !== currentUrl) return resolved;
   }
-  return null;
+
+  // Text-based fallback for sites that do not expose semantic next selectors.
+  let fallbackHref = null;
+  $('a[href]').each((_, a) => {
+    if (fallbackHref) return;
+    const text = normalizeSpace($(a).text()).toLowerCase();
+    if (['next', 'next page', '>', '>>'].includes(text)) {
+      fallbackHref = $(a).attr('href');
+    }
+  });
+
+  return resolveUrl(fallbackHref, currentUrl);
+}
+
+function pickContainer($, el) {
+  return $(el).closest(
+    'article, .card, .photo-item, .gallery-item, .post, .inspiration-item, figure, .item, li, [class*="vendor"], [class*="listing"], [class*="result"]'
+  );
+}
+
+function pickName($, container, el, config) {
+  const selectors = [
+    config.titleSelector,
+    '[itemprop="name"]',
+    'h1, h2, h3, h4',
+    '[class*="title"]',
+    '[class*="name"]',
+  ].filter(Boolean);
+
+  for (const sel of selectors) {
+    const txt = normalizeSpace(container.find(sel).first().text());
+    if (txt && txt.length >= 3) return txt.slice(0, 255);
+  }
+
+  const alt = normalizeSpace($(el).attr('alt') || $(el).attr('title'));
+  if (alt && alt.length >= 3) return alt.slice(0, 255);
+
+  const raw = normalizeSpace(container.text());
+  if (!raw) return null;
+  return raw.split('|')[0].split('.')[0].trim().slice(0, 255) || null;
 }
 
 /**
@@ -116,24 +180,19 @@ async function scrapePage(url, config, rateLimitMs = 1500) {
     seen.add(imageUrl);
 
     // Try to find associated title + description from nearby DOM elements
-    const container = $(el).closest(
-      'article, .card, .photo-item, .gallery-item, .post, .inspiration-item, figure, .item'
-    );
+    const container = pickContainer($, el);
 
-    const title = (
-      container.find(config.titleSelector).first().text() ||
-      $(el).attr('alt') ||
-      $(el).attr('title') ||
-      ''
-    ).trim().slice(0, 255);
+    const title = pickName($, container, el, config);
 
     const description = (
       container.find(config.descSelector).first().text() || ''
-    ).trim().slice(0, 1000);
+    ).trim().slice(0, 1000) || null;
 
-    const priceText = config.priceSelector
+    const selectorPrice = config.priceSelector
       ? container.find(config.priceSelector).first().text().trim()
       : null;
+
+    const inferredPrice = extractSeedPrice(`${selectorPrice || ''} ${container.text()}`);
 
     const scrapedTags = [];
     // Extract any category/tag links near the image
@@ -146,9 +205,9 @@ async function scrapePage(url, config, rateLimitMs = 1500) {
       imageUrl,
       sourceUrl:   url,
       title:       title || null,
-      description: description || null,
+      description,
       scrapedTags: [...new Set(scrapedTags)].slice(0, 10),
-      priceText:   priceText || null,
+      priceText:   inferredPrice || selectorPrice || null,
     });
   });
 

@@ -34,15 +34,15 @@ export function LiveTicker({ budget, step }) {
 
 export function StepNav({ step, setStep }) {
   return (
-    <div style={{ background:'var(--maroon-dark)', overflowX:'auto' }}>
-      <div style={{ display:'flex', minWidth:'max-content', padding:'0 16px' }}>
+    <div style={{ background:'var(--maroon-dark)', borderBottom:'1px solid rgba(232,201,122,0.18)', overflowX:'auto' }}>
+      <div style={{ display:'flex', minWidth:'max-content', padding:'0 28px' }}>
         {STEP_LABELS.map((label, i) => {
           const n = i + 1;
           const active = step === n;
           const done   = step > n;
           return (
             <button key={n} onClick={() => setStep(n)} style={{
-              padding:'12px 16px', fontSize:11, fontWeight:600,
+              padding:'10px 16px 9px', fontSize:11, fontWeight:700,
               letterSpacing:'1px', textTransform:'uppercase',
               color: done ? 'var(--gold)' : active ? '#E8C97A' : 'rgba(255,255,255,0.38)',
               background:'none', border:'none',

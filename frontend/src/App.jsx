@@ -187,7 +187,7 @@ export default function App() {
       {/* Header */}
       <div style={{ background:'var(--maroon)', padding:'16px 28px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
         <div>
-          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:24, fontWeight:700, color:'#E8C97A', letterSpacing:'1px', cursor: user ? 'pointer' : 'default' }}
+          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:24, fontWeight:700, color:'#E8C97A', cursor: user ? 'pointer' : 'default' }}
             onClick={() => user && setActiveWedding(null)}>
             WeddingBudget<span style={{ color:'var(--gold)' }}>.ai</span>
           </div>

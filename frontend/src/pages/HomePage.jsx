@@ -287,7 +287,7 @@ export default function HomePage() {
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: '#6B1E3A', marginBottom: 6 }}>About us</div>
           <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.8 }}>
-            Events By Athea creates bespoke wedding and luxury event experiences. Follow on Instagram: <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ color: '#6B1E3A', fontWeight: 700, textDecoration: 'none' }}>@eventsbyathea</a>
+            Events By Athea &nbsp;|&nbsp; Event Planner &nbsp;|&nbsp; Bespoke Wedding Designers and Luxury Events &nbsp;|&nbsp; <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ color: '#6B1E3A', fontWeight: 700, textDecoration: 'none' }}>@eventsbyathea</a>
           </div>
         </div>
       </footer>
