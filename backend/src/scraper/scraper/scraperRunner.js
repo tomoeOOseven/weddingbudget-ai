@@ -223,6 +223,7 @@ async function runScrapeJob(source, triggeredBy = null, runOptions = {}) {
     maxPages:      didExpand ? 1 : defaultMaxPages,
     followNextPages: didExpand ? false : (dbSelectors.followNextPages ?? codeConfig.followNextPages ?? true),
     stopOnEmptyPage: isWedMeGood,
+    wedmegoodMode: isWedMeGood,
     // DB-stored selectors override code selectors
     imageSelector: dbSelectors.imageSelector ?? codeConfig.imageSelector ?? 'img',
     titleSelector: dbSelectors.titleSelector ?? codeConfig.titleSelector ?? 'h2, h3',

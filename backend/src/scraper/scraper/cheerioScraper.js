@@ -23,6 +23,11 @@ const PRICE_PATTERNS = [
   /([\d,]{4,})\s*(?:onwards|onward)/i,
 ];
 
+const NOISE_NAME_PATTERNS = [
+  /^(log\s*in|login|sign\s*up|signup|menu|view\s*all|read\s*more)$/i,
+  /^(home|about|contact|privacy|terms)$/i,
+];
+
 function normalizeSpace(text = '') {
   return String(text).replace(/\s+/g, ' ').trim();
 }
@@ -42,6 +47,12 @@ function extractSeedPrice(text = '') {
   return null;
 }
 
+function isProbableNoiseName(name = '') {
+  const low = normalizeSpace(name).toLowerCase();
+  if (!low || low.length < 3) return true;
+  return NOISE_NAME_PATTERNS.some((pattern) => pattern.test(low));
+}
+
 /**
  * Resolve a potentially relative URL against a base URL.
  */
@@ -59,19 +70,143 @@ function resolveUrl(href, base) {
  * Prefers data-src / srcset (lazy-loaded) over src.
  */
 function extractImgSrc($, el, baseUrl) {
-  const attrs = ['data-lazy-src', 'data-src', 'data-original', 'srcset', 'src'];
+  const attrs = ['data-lazy-src', 'data-src', 'data-original', 'data-image', 'data-srcset', 'srcset', 'src'];
   for (const attr of attrs) {
     let val = $(el).attr(attr);
     if (!val) continue;
     // srcset: take the first URL (highest resolution comes last — take last)
-    if (attr === 'srcset') {
+    if (attr === 'srcset' || attr === 'data-srcset') {
       const parts = val.split(',').map(s => s.trim().split(/\s+/)[0]).filter(Boolean);
-      val = parts[parts.length - 1] ?? parts[0];
+      val = parts[0] ?? parts[parts.length - 1];
     }
     const url = resolveUrl(val, baseUrl);
     if (url && /\.(jpe?g|png|webp|avif)(\?|$)/i.test(url)) return url;
   }
   return null;
+}
+
+function pickNameFromCard($, card, img, config) {
+  const selectors = [
+    config.titleSelector,
+    '[itemprop="name"]',
+    'h1, h2, h3, h4',
+    '[class*="title"]',
+    '[class*="name"]',
+    '[class*="heading"]',
+  ].filter(Boolean);
+
+  for (const sel of selectors) {
+    const txt = normalizeSpace(card.find(sel).first().text());
+    if (txt && !isProbableNoiseName(txt)) return txt.slice(0, 255);
+  }
+
+  const alt = normalizeSpace($(img).attr('alt') || $(img).attr('title'));
+  if (alt && !isProbableNoiseName(alt)) return alt.slice(0, 255);
+
+  const raw = normalizeSpace(card.text());
+  if (!raw) return null;
+  const candidate = raw.split('|')[0].split('.')[0].trim();
+  if (!candidate || isProbableNoiseName(candidate)) return null;
+  return candidate.slice(0, 255);
+}
+
+function extractWedMeGoodCards($, pageUrl, config) {
+  const out = [];
+  const seen = new Set();
+
+  const selector = 'div[class*="vendor" i], a[href*="/profile/"]';
+  $(selector).each((_, el) => {
+    const card = $(el);
+    const img = card.find('img').first();
+    if (!img.length) return;
+
+    const imageUrl = extractImgSrc($, img, pageUrl);
+    if (!imageUrl) return;
+
+    const title = pickNameFromCard($, card, img, config);
+    if (!title) return;
+
+    const linkHref = card.find('a[href]').first().attr('href') || card.closest('a[href]').attr('href') || null;
+    const listingUrl = resolveUrl(linkHref, pageUrl);
+    const textBlob = normalizeSpace(card.text());
+    const selectorPrice = config.priceSelector ? normalizeSpace(card.find(config.priceSelector).first().text()) : null;
+    const priceText = extractSeedPrice(`${selectorPrice || ''} ${textBlob}`) || selectorPrice || null;
+
+    const dedupeKey = `${title.toLowerCase()}|${imageUrl}|${listingUrl || ''}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+
+    out.push({
+      imageUrl,
+      sourceUrl: pageUrl,
+      title,
+      description: textBlob ? textBlob.slice(0, 1000) : null,
+      scrapedTags: [],
+      priceText,
+      listingUrl: listingUrl || null,
+    });
+  });
+
+  return out;
+}
+
+function extractFromJsonLd($, pageUrl) {
+  const out = [];
+  const seen = new Set();
+
+  $('script[type="application/ld+json"]').each((_, node) => {
+    const raw = normalizeSpace($(node).text() || '');
+    if (!raw) return;
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const stack = Array.isArray(data) ? [...data] : [data];
+    while (stack.length) {
+      const obj = stack.pop();
+      if (Array.isArray(obj)) {
+        stack.push(...obj);
+        continue;
+      }
+      if (!obj || typeof obj !== 'object') continue;
+
+      if (obj['@graph']) stack.push(obj['@graph']);
+      if (obj.itemListElement) stack.push(obj.itemListElement);
+
+      const item = obj.item && typeof obj.item === 'object' ? obj.item : obj;
+      const title = normalizeSpace(item.name || '');
+      if (!title || isProbableNoiseName(title)) continue;
+
+      const imageRaw = Array.isArray(item.image) ? item.image[0] : item.image;
+      const imageUrl = resolveUrl(String(imageRaw || ''), pageUrl);
+
+      const listingUrl = resolveUrl(String(item.url || ''), pageUrl);
+      const offerPrice = item.offers?.price || item.offers?.priceSpecification?.price || null;
+      const priceText = offerPrice ? extractSeedPrice(String(offerPrice)) || `Rs ${Number(String(offerPrice).replace(/[^\d]/g, ''))}` : extractSeedPrice(JSON.stringify(item));
+
+      if (!imageUrl && !priceText) continue;
+
+      const dedupeKey = `${title.toLowerCase()}|${imageUrl || ''}|${listingUrl || ''}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+
+      out.push({
+        imageUrl: imageUrl || null,
+        sourceUrl: pageUrl,
+        title: title.slice(0, 255),
+        description: null,
+        scrapedTags: [],
+        priceText: priceText || null,
+        listingUrl: listingUrl || null,
+      });
+    }
+  });
+
+  return out.filter((row) => Boolean(row.imageUrl));
 }
 
 /**
@@ -161,6 +296,28 @@ async function scrapePage(url, config, rateLimitMs = 1500) {
   const images = [];
   const seen   = new Set();
 
+  if (config.wedmegoodMode) {
+    const combined = [
+      ...extractWedMeGoodCards($, url, config),
+      ...extractFromJsonLd($, url),
+    ];
+
+    for (const row of combined) {
+      if (!row.imageUrl || seen.has(row.imageUrl)) continue;
+      seen.add(row.imageUrl);
+      images.push({
+        imageUrl: row.imageUrl,
+        sourceUrl: row.sourceUrl,
+        title: row.title,
+        description: row.description,
+        scrapedTags: row.scrapedTags,
+        priceText: row.priceText,
+      });
+    }
+
+    return { images, nextUrl: null };
+  }
+
   $(config.imageSelector).each((_, el) => {
     const imageUrl = extractImgSrc($, el, url);
     if (!imageUrl || seen.has(imageUrl)) return;
@@ -229,8 +386,10 @@ async function runCheerioScraper(config, maxPages, logFn = () => {}) {
   const seenUrls  = new Set();
   const followNextPages = config.followNextPages !== false;
   const stopOnEmptyPage = config.stopOnEmptyPage === true;
+  let stopAll = false;
 
   for (const seedUrl of config.urls) {
+    if (stopAll) break;
     let currentUrl = seedUrl;
     let page = 0;
 
@@ -250,6 +409,7 @@ async function runCheerioScraper(config, maxPages, logFn = () => {}) {
       logFn(`[cheerio]   → found ${images.length} images (total: ${allImages.length})`);
       if (stopOnEmptyPage && images.length === 0) {
         logFn('[cheerio] Empty page detected, stopping further pagination for this source.');
+        if (!followNextPages) stopAll = true;
         break;
       }
       currentUrl = followNextPages ? nextUrl : null;
