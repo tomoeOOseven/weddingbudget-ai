@@ -1,21 +1,65 @@
 // services/budgetService.js — async budget calculator using live Supabase data
 // refData is the shaped object from /api/data/all
 
+function requireFiniteNumber(value, field) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    throw new Error(`Missing DB-backed config: ${field}`);
+  }
+  return n;
+}
+
 function calculateBudget(inputs, refData) {
   const {
     city, hotelTier, rooms, guests, outstationPct, functions,
     selectedDecors = [], selectedArtists = [], selectedMeals = [],
-    barTier = 'wine', specialtyCounters = [],
+    barTier, specialtyCounters = [],
     transfers = true, ghodi = true, dholis = 2, sfx = [],
     roomBaskets = true, rituals = true, gifts = true,
     stationery = true, photography = true,
   } = inputs;
 
-  const cm  = refData.cities?.[city]?.mult ?? 1.0;
-  const hd  = refData.hotelTiers?.[hotelTier] ?? { decorMult: 1.0, costMult: 1.0, roomRate: 8000, label: hotelTier };
+  const cityCfg = refData.cities?.[city];
+  const hotelCfg = refData.hotelTiers?.[hotelTier];
+  if (!cityCfg) throw new Error(`City not found in DB config: ${city}`);
+  if (!hotelCfg) throw new Error(`Hotel tier not found in DB config: ${hotelTier}`);
+
+  const cm  = requireFiniteNumber(cityCfg.mult, `cities.multiplier (${city})`);
+  const hd  = {
+    label: hotelCfg.label,
+    roomRate: requireFiniteNumber(hotelCfg.roomRate, `hotel_tiers.room_rate (${hotelTier})`),
+    costMult: requireFiniteNumber(hotelCfg.costMult, `hotel_tiers.cost_mult (${hotelTier})`),
+    decorMult: requireFiniteNumber(hotelCfg.decorMult, `hotel_tiers.decor_mult (${hotelTier})`),
+  };
   const nFn = Array.isArray(functions) ? functions.length : (functions?.size ?? 1);
-  const L   = refData.logistics   ?? {};
-  const S   = refData.sundries    ?? {};
+  const L   = refData.logistics;
+  const S   = refData.sundries;
+  if (!L) throw new Error('Missing DB-backed logistics config');
+  if (!S) throw new Error('Missing DB-backed sundries config');
+
+  const logistics = {
+    vehiclePerHead: requireFiniteNumber(L.vehiclePerHead, 'logistics_rates.guests_per_vehicle'),
+    vehicleRateMin: requireFiniteNumber(L.vehicleRateMin, 'logistics_rates.vehicle_rate_min'),
+    vehicleRateMax: requireFiniteNumber(L.vehicleRateMax, 'logistics_rates.vehicle_rate_max'),
+    ghodiMin: requireFiniteNumber(L.ghodiMin, 'logistics_rates.ghodi_min'),
+    ghodiMax: requireFiniteNumber(L.ghodiMax, 'logistics_rates.ghodi_max'),
+    dholiUnitMin: requireFiniteNumber(L.dholiUnitMin, 'logistics_rates.dholi_unit_min'),
+    dholiUnitMax: requireFiniteNumber(L.dholiUnitMax, 'logistics_rates.dholi_unit_max'),
+  };
+
+  const sundries = {
+    roomBasketMin: requireFiniteNumber(S.roomBasketMin, 'sundries_config.room_basket_min'),
+    roomBasketMax: requireFiniteNumber(S.roomBasketMax, 'sundries_config.room_basket_max'),
+    ritualPerFnMin: requireFiniteNumber(S.ritualPerFnMin, 'sundries_config.ritual_per_fn_min'),
+    ritualPerFnMax: requireFiniteNumber(S.ritualPerFnMax, 'sundries_config.ritual_per_fn_max'),
+    giftPerGuestMin: requireFiniteNumber(S.giftPerGuestMin, 'sundries_config.gift_per_guest_min'),
+    giftPerGuestMax: requireFiniteNumber(S.giftPerGuestMax, 'sundries_config.gift_per_guest_max'),
+    stationeryPerGuestMin: requireFiniteNumber(S.stationeryPerGuestMin, 'sundries_config.stationery_per_guest_min'),
+    stationeryPerGuestMax: requireFiniteNumber(S.stationeryPerGuestMax, 'sundries_config.stationery_per_guest_max'),
+    photographyMin: requireFiniteNumber(S.photographyMin, 'sundries_config.photography_min'),
+    photographyMax: requireFiniteNumber(S.photographyMax, 'sundries_config.photography_max'),
+    contingencyPct: requireFiniteNumber(S.contingencyPct, 'sundries_config.contingency_pct'),
+  };
   const items = [];
 
   // 1. Venue & Accommodation
@@ -51,7 +95,8 @@ function calculateBudget(inputs, refData) {
     const m = mealList.find(x => x.id === mId || x.slug === mId);
     if (m) { fbMin += m.costMinPH * guests * cm * 0.9; fbMax += m.costMaxPH * guests * cm * 1.1; }
   });
-  const bar = barList.find(x => x.id === barTier || x.slug === barTier) ?? barList[1] ?? { costMinPH: 0, costMaxPH: 0, label: 'Bar' };
+  const bar = barList.find(x => x.id === barTier || x.slug === barTier) ?? barList[0];
+  if (!bar) throw new Error('No active bar tier found in DB config');
   fbMin += bar.costMinPH * guests * cm;
   fbMax += bar.costMaxPH * guests * cm;
   const arrCounters = Array.isArray(specialtyCounters) ? specialtyCounters : [...specialtyCounters];
@@ -78,14 +123,15 @@ function calculateBudget(inputs, refData) {
   // 5. Logistics
   let lMin = 0, lMax = 0;
   if (transfers) {
-    const outGuests = Math.round(guests * ((outstationPct ?? 50) / 100));
-    const vehicles  = Math.ceil(outGuests / (L.vehiclePerHead ?? 3));
-    lMin += vehicles * (L.vehicleRateMin ?? 4500) * 2;
-    lMax += vehicles * (L.vehicleRateMax ?? 7000) * 2;
+    const outstationPercent = Number.isFinite(Number(outstationPct)) ? Number(outstationPct) : 0;
+    const outGuests = Math.round(guests * (outstationPercent / 100));
+    const vehicles  = Math.ceil(outGuests / logistics.vehiclePerHead);
+    lMin += vehicles * logistics.vehicleRateMin * 2;
+    lMax += vehicles * logistics.vehicleRateMax * 2;
   }
-  if (ghodi) { lMin += (L.ghodiMin ?? 45000) * cm; lMax += (L.ghodiMax ?? 90000) * cm; }
-  lMin += dholis * (L.dholiUnitMin ?? 15000) * cm;
-  lMax += dholis * (L.dholiUnitMax ?? 30000) * cm;
+  if (ghodi) { lMin += logistics.ghodiMin * cm; lMax += logistics.ghodiMax * cm; }
+  lMin += dholis * logistics.dholiUnitMin * cm;
+  lMax += dholis * logistics.dholiUnitMax * cm;
   const sfxList = refData.sfxItems ?? [];
   const arrSfx  = Array.isArray(sfx) ? sfx : [...sfx];
   arrSfx.forEach(sId => {
@@ -96,15 +142,15 @@ function calculateBudget(inputs, refData) {
 
   // 6. Sundries & Extras
   let sMin = 0, sMax = 0;
-  if (roomBaskets) { sMin += rooms * (S.roomBasketMin ?? 1800); sMax += rooms * (S.roomBasketMax ?? 3500); }
-  if (rituals)     { sMin += nFn   * (S.ritualPerFnMin ?? 35000); sMax += nFn * (S.ritualPerFnMax ?? 75000); }
-  if (gifts)       { sMin += guests * (S.giftPerGuestMin ?? 500); sMax += guests * (S.giftPerGuestMax ?? 1500); }
-  if (stationery)  { sMin += guests * (S.stationeryPerGuestMin ?? 200); sMax += guests * (S.stationeryPerGuestMax ?? 500); }
-  if (photography) { sMin += (S.photographyMin ?? 180000) * cm; sMax += (S.photographyMax ?? 550000) * cm; }
+  if (roomBaskets) { sMin += rooms * sundries.roomBasketMin; sMax += rooms * sundries.roomBasketMax; }
+  if (rituals)     { sMin += nFn   * sundries.ritualPerFnMin; sMax += nFn * sundries.ritualPerFnMax; }
+  if (gifts)       { sMin += guests * sundries.giftPerGuestMin; sMax += guests * sundries.giftPerGuestMax; }
+  if (stationery)  { sMin += guests * sundries.stationeryPerGuestMin; sMax += guests * sundries.stationeryPerGuestMax; }
+  if (photography) { sMin += sundries.photographyMin * cm; sMax += sundries.photographyMax * cm; }
   const subMin = items.reduce((t, i) => t + i.min, 0);
   const subMax = items.reduce((t, i) => t + i.max, 0);
-  sMin += subMin * (S.contingencyPct ?? 0.05);
-  sMax += subMax * (S.contingencyPct ?? 0.05);
+  sMin += subMin * sundries.contingencyPct;
+  sMax += subMax * sundries.contingencyPct;
   if (sMin > 0) items.push({ cat: 'Sundries & Extras', sub: 'Gifts · Photography · Contingency', min: sMin, max: sMax });
 
   const totalMin = items.reduce((t, i) => t + i.min, 0);

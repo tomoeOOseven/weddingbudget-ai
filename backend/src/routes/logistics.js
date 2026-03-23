@@ -23,14 +23,29 @@ router.post('/estimate', async (req, res) => {
     sfxIds.length ? supabase.from('sfx_items').select('*').in('id', sfxIds) : { data: [] },
   ]);
 
-  const L  = lr?.[0] ?? {};
-  const cm = cityRow?.multiplier ?? 1.0;
-  const vehicles = Math.ceil(outstationGuests / (L.guests_per_vehicle ?? 3));
-  let lMin = vehicles * (L.vehicle_rate_min ?? 4500) * 2;
-  let lMax = vehicles * (L.vehicle_rate_max ?? 7000) * 2;
-  if (ghodi) { lMin += (L.ghodi_min ?? 45000) * cm; lMax += (L.ghodi_max ?? 90000) * cm; }
-  lMin += dholis * (L.dholi_unit_min ?? 15000) * cm;
-  lMax += dholis * (L.dholi_unit_max ?? 30000) * cm;
+  const L = lr?.[0];
+  const cm = Number(cityRow?.multiplier);
+  if (!L || !Number.isFinite(cm)) {
+    return res.status(400).json({ error: 'Missing DB-backed logistics or city multiplier config.' });
+  }
+
+  const guestsPerVehicle = Number(L.guests_per_vehicle);
+  const vehicleRateMin = Number(L.vehicle_rate_min);
+  const vehicleRateMax = Number(L.vehicle_rate_max);
+  const ghodiMin = Number(L.ghodi_min);
+  const ghodiMax = Number(L.ghodi_max);
+  const dholiUnitMin = Number(L.dholi_unit_min);
+  const dholiUnitMax = Number(L.dholi_unit_max);
+  if (![guestsPerVehicle, vehicleRateMin, vehicleRateMax, ghodiMin, ghodiMax, dholiUnitMin, dholiUnitMax].every(Number.isFinite)) {
+    return res.status(400).json({ error: 'Incomplete DB-backed logistics rates.' });
+  }
+
+  const vehicles = Math.ceil(outstationGuests / guestsPerVehicle);
+  let lMin = vehicles * vehicleRateMin * 2;
+  let lMax = vehicles * vehicleRateMax * 2;
+  if (ghodi) { lMin += ghodiMin * cm; lMax += ghodiMax * cm; }
+  lMin += dholis * dholiUnitMin * cm;
+  lMax += dholis * dholiUnitMax * cm;
   (sfxItems ?? []).forEach(s => { lMin += s.cost_fixed * 0.9; lMax += s.cost_fixed * 1.3; });
 
   res.json({ lMin: Math.round(lMin), lMax: Math.round(lMax), lMid: Math.round((lMin + lMax) / 2), vehicles });

@@ -18,7 +18,7 @@ async function getRefData() {
   const [
     { data: cities }, { data: hotelTiers }, { data: artists }, { data: meals },
     { data: barTiers }, { data: specialtyCounters }, { data: lr }, { data: sfxItems },
-    { data: sc }, { data: decor },
+    { data: sc }, { data: decor }, { data: eventFunctions },
   ] = await Promise.all([
     supabase.from('cities').select('*').eq('is_active', true),
     supabase.from('hotel_tiers').select('*').eq('is_active', true),
@@ -30,8 +30,14 @@ async function getRefData() {
     supabase.from('sfx_items').select('*').eq('is_active', true),
     supabase.from('sundries_config').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1),
     supabase.from('decor_items').select('*').eq('is_active', true),
+    supabase.from('event_functions').select('slug, sort_order').eq('is_active', true).order('sort_order').order('slug'),
   ]);
-  const L = lr?.[0] ?? {}, S = sc?.[0] ?? {};
+  const L = lr?.[0];
+  const S = sc?.[0];
+  if (!L || !S) {
+    throw new Error('Required DB-backed logistics/sundries config missing');
+  }
+
   _refData = {
     cities:    Object.fromEntries((cities ?? []).map(c => [c.slug, { mult: c.multiplier, label: c.label, id: c.id }])),
     hotelTiers:Object.fromEntries((hotelTiers ?? []).map(h => [h.slug, { label: h.label, roomRate: h.room_rate, costMult: h.cost_mult, decorMult: h.decor_mult }])),
@@ -41,8 +47,29 @@ async function getRefData() {
     specialtyCounters: (specialtyCounters ?? []).map(c => ({ id: c.id, slug: c.slug, label: c.label, costMin: c.cost_min, costMax: c.cost_max })),
     sfxItems:  (sfxItems ?? []).map(s => ({ id: s.id, slug: s.slug, label: s.label, cost: s.cost_fixed })),
     decor:     (decor ?? []).map(d => ({ id: d.id, label: d.label, function: d.function_type, style: d.style, complexity: d.complexity, costMin: d.cost_min, costMax: d.cost_max })),
-    logistics: { vehiclePerHead: L.guests_per_vehicle ?? 3, vehicleRateMin: L.vehicle_rate_min ?? 4500, vehicleRateMax: L.vehicle_rate_max ?? 7000, ghodiMin: L.ghodi_min ?? 45000, ghodiMax: L.ghodi_max ?? 90000, dholiUnitMin: L.dholi_unit_min ?? 15000, dholiUnitMax: L.dholi_unit_max ?? 30000 },
-    sundries:  { roomBasketMin: S.room_basket_min ?? 1800, roomBasketMax: S.room_basket_max ?? 3500, ritualPerFnMin: S.ritual_per_fn_min ?? 35000, ritualPerFnMax: S.ritual_per_fn_max ?? 75000, giftPerGuestMin: S.gift_per_guest_min ?? 500, giftPerGuestMax: S.gift_per_guest_max ?? 1500, stationeryPerGuestMin: S.stationery_per_guest_min ?? 200, stationeryPerGuestMax: S.stationery_per_guest_max ?? 500, photographyMin: S.photography_min ?? 180000, photographyMax: S.photography_max ?? 550000, contingencyPct: S.contingency_pct ?? 0.05 },
+    logistics: {
+      vehiclePerHead: L.guests_per_vehicle,
+      vehicleRateMin: L.vehicle_rate_min,
+      vehicleRateMax: L.vehicle_rate_max,
+      ghodiMin: L.ghodi_min,
+      ghodiMax: L.ghodi_max,
+      dholiUnitMin: L.dholi_unit_min,
+      dholiUnitMax: L.dholi_unit_max,
+    },
+    sundries:  {
+      roomBasketMin: S.room_basket_min,
+      roomBasketMax: S.room_basket_max,
+      ritualPerFnMin: S.ritual_per_fn_min,
+      ritualPerFnMax: S.ritual_per_fn_max,
+      giftPerGuestMin: S.gift_per_guest_min,
+      giftPerGuestMax: S.gift_per_guest_max,
+      stationeryPerGuestMin: S.stationery_per_guest_min,
+      stationeryPerGuestMax: S.stationery_per_guest_max,
+      photographyMin: S.photography_min,
+      photographyMax: S.photography_max,
+      contingencyPct: S.contingency_pct,
+    },
+    functions: (eventFunctions ?? []).map((f) => f.slug),
   };
   _refDataAt = Date.now();
   return _refData;
@@ -58,8 +85,11 @@ router.post('/', async (req, res) => {
     // Optional ML inference for decor items (disabled by default).
     const arrDecors = Array.isArray(req.body.selectedDecors) ? req.body.selectedDecors : [...(req.body.selectedDecors ?? [])];
     if (ML_PREDICT_ENABLED && arrDecors.length > 0) {
-      const cityMult     = refData.cities?.[req.body.city]?.mult ?? 1.0;
-      const hotelMult    = refData.hotelTiers?.[req.body.hotelTier]?.decorMult ?? 1.0;
+      const cityMult = Number(refData.cities?.[req.body.city]?.mult);
+      const hotelMult = Number(refData.hotelTiers?.[req.body.hotelTier]?.decorMult);
+      if (!Number.isFinite(cityMult) || !Number.isFinite(hotelMult)) {
+        throw new Error('Missing DB-backed city/hotel multiplier config for ML estimate enhancement');
+      }
       const mlPredictions = await Promise.all(
         arrDecors.map(dId => {
           const d = refData.decor.find(x => x.id === dId);
@@ -115,8 +145,16 @@ router.post('/', async (req, res) => {
 router.post('/quick', async (req, res) => {
   try {
     const refData = await getRefData();
-    const { city = 'hyderabad', hotelTier = 'star4', rooms = 50, guests = 200 } = req.body;
-    const result  = calculateBudget({ city, hotelTier, rooms, guests, outstationPct: 50, functions: ['sangeet', 'pheras', 'reception'] }, refData);
+    const defaultCity = Object.keys(refData.cities ?? {})[0];
+    const defaultHotelTier = Object.keys(refData.hotelTiers ?? {})[0];
+    const defaultFunctions = (refData.functions ?? []).slice(0, 3);
+
+    if (!defaultCity || !defaultHotelTier || defaultFunctions.length === 0) {
+      throw new Error('Missing DB-backed defaults for quick estimate');
+    }
+
+    const { city = defaultCity, hotelTier = defaultHotelTier, rooms = 50, guests = 200 } = req.body;
+    const result  = calculateBudget({ city, hotelTier, rooms, guests, outstationPct: 50, functions: defaultFunctions }, refData);
     res.json({ summary: result.summary, meta: result.meta });
   } catch (err) {
     res.status(500).json({ error: err.message });

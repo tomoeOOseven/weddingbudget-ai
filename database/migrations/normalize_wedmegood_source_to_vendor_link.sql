@@ -24,8 +24,11 @@ set
   is_active = true,
   updated_at = now();
 
--- Remove all non-canonical WedMeGood source rows.
-delete from public.scrape_sources
+-- Disable non-canonical WedMeGood source rows (do not delete: scrape_jobs FK keeps history).
+update public.scrape_sources
+set
+  is_active = false,
+  updated_at = now()
 where lower(base_url) like '%wedmegood.com%'
   and lower(base_url) <> 'https://www.wedmegood.com/vendors/all/wedding-decorators/';
 

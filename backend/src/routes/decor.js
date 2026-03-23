@@ -42,8 +42,11 @@ router.post('/score', async (req, res) => {
   const { selections = [], city = 'hyderabad', hotelTier = 'star4' } = req.body;
   const { data: cityRow }  = await supabase.from('cities').select('multiplier').eq('slug', city).single();
   const { data: hotelRow } = await supabase.from('hotel_tiers').select('decor_mult').eq('slug', hotelTier).single();
-  const cityMult      = cityRow?.multiplier      ?? 1.0;
-  const hotelDecorMult = hotelRow?.decor_mult    ?? 1.0;
+  const cityMult = Number(cityRow?.multiplier);
+  const hotelDecorMult = Number(hotelRow?.decor_mult);
+  if (!Number.isFinite(cityMult) || !Number.isFinite(hotelDecorMult)) {
+    return res.status(400).json({ error: 'Missing DB-backed city/hotel multiplier config for scoring.' });
+  }
 
   const scored = await Promise.all(
     selections.map(async sel => {
@@ -53,11 +56,14 @@ router.post('/score', async (req, res) => {
       });
       if (ml) return { decorId: sel.decorId, label: sel.label, ...ml };
       // Rule-based fallback
+      if (!Number.isFinite(Number(sel.costMin)) || !Number.isFinite(Number(sel.costMax))) {
+        throw new Error(`Missing DB-backed cost seed for decor selection: ${sel.decorId || sel.label || 'unknown'}`);
+      }
       return {
         decorId:   sel.decorId,
         label:     sel.label,
-        cost_min:  Math.round((sel.costMin ?? 200000) * cityMult * hotelDecorMult * 0.9),
-        cost_max:  Math.round((sel.costMax ?? 500000) * cityMult * hotelDecorMult * 1.1),
+        cost_min:  Math.round(Number(sel.costMin) * cityMult * hotelDecorMult * 0.9),
+        cost_max:  Math.round(Number(sel.costMax) * cityMult * hotelDecorMult * 1.1),
         confidence: 0.45,
         source:    'rule_based',
       };

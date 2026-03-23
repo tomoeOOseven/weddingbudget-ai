@@ -24,7 +24,10 @@ router.get('/specialty-counters', async (req, res) => {
 router.post('/estimate', async (req, res) => {
   const { guestCount, mealIds = [], barTierId, counterIds = [], city = 'hyderabad' } = req.body;
   const { data: cityRow } = await supabase.from('cities').select('multiplier').eq('slug', city).single();
-  const cm = cityRow?.multiplier ?? 1.0;
+  const cm = Number(cityRow?.multiplier);
+  if (!Number.isFinite(cm)) {
+    return res.status(400).json({ error: 'Missing DB-backed city multiplier config.' });
+  }
 
   const [{ data: meals }, { data: bar }, { data: counters }] = await Promise.all([
     supabase.from('meals').select('*').in('id', mealIds.length ? mealIds : ['__none__']),

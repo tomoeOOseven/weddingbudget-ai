@@ -70,8 +70,8 @@ async function predictCost(params) {
       function_type:    params.functionType  ?? null,
       style:            params.style         ?? null,
       complexity:       params.complexity    ?? null,
-      city_mult:        params.cityMult      ?? 1.0,
-      hotel_decor_mult: params.hotelDecorMult ?? 1.0,
+      city_mult:        params.cityMult      ?? null,
+      hotel_decor_mult: params.hotelDecorMult ?? null,
     }, { timeout: TIMEOUT });
 
     return data;
