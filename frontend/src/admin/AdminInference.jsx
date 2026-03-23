@@ -45,6 +45,27 @@ async function apiFetch(path, opts = {}) {
   return res.json();
 }
 
+function extractInferenceSummary(prediction) {
+  const arr = Array.isArray(prediction?.data) ? prediction.data : [];
+  const predictedTier = typeof arr[0] === 'string' ? arr[0] : '-';
+  const priceRange = typeof arr[1] === 'string' ? arr[1] : '-';
+  const details = typeof arr[2] === 'string' ? arr[2] : '';
+
+  const confidenceMatch = details.match(/\*\*Confidence:\*\*\s*([^\n]+)/i);
+  const timeMatch = details.match(/\*\*Inference time:\*\*\s*([^\n]+)/i);
+
+  const confidence = confidenceMatch?.[1]?.trim() || '-';
+  const inferenceTime = timeMatch?.[1]?.trim() ||
+    (typeof prediction?.duration === 'number' ? `${prediction.duration.toFixed(2)}s` : '-');
+
+  return {
+    predictedTier,
+    priceRange,
+    confidence,
+    inferenceTime,
+  };
+}
+
 export default function AdminInference() {
   const [loading, setLoading] = useState(true);
   const [images, setImages] = useState([]);
@@ -234,16 +255,17 @@ export default function AdminInference() {
             {prediction && (
               <div style={{ marginTop: 12, border:'1px solid #e0d5c5', borderRadius:8, padding:10, background:'#faf7f2' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#333', marginBottom: 6 }}>Inference Response</div>
-                {Array.isArray(prediction.data) && (
-                  <div style={{ fontSize: 12, color: '#333', marginBottom: 8, lineHeight: 1.6 }}>
-                    {prediction.data.map((line, idx) => (
-                      <div key={idx}>{line === null ? 'null' : String(line)}</div>
-                    ))}
-                  </div>
-                )}
-                <pre style={{ margin:0, whiteSpace:'pre-wrap', wordBreak:'break-word', fontSize:11, color:'#475569' }}>
-                  {JSON.stringify(prediction, null, 2)}
-                </pre>
+                {(() => {
+                  const summary = extractInferenceSummary(prediction);
+                  return (
+                    <div style={{ fontSize: 12, color: '#333', lineHeight: 1.8 }}>
+                      <div><strong>Predicted Tier:</strong> {summary.predictedTier}</div>
+                      <div><strong>Price Range:</strong> {summary.priceRange}</div>
+                      <div><strong>Confidence:</strong> {summary.confidence}</div>
+                      <div><strong>Inference Time:</strong> {summary.inferenceTime}</div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
