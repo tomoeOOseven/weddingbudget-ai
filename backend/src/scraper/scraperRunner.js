@@ -95,19 +95,13 @@ async function runScrapeJob(source, triggeredBy = null) {
   logger.log(`Scraper type: ${source.scraper_type} | Rate limit: ${source.rate_limit_ms}ms`);
 
   // ── 2. Build effective config (DB selectors override code config) ─────
-  const codeConfig =
-    SITE_CONFIGS[source.base_url] ??
-    Object.entries(SITE_CONFIGS).find(([k]) => source.base_url.startsWith(k))?.[1] ??
-    {};
-
-  const effectiveScraperType =
-    source.scraper_type ?? codeConfig.scraper_type ?? codeConfig.scraper ?? 'cheerio';
+  const codeConfig = SITE_CONFIGS[source.base_url] ?? {};
 
   // DB selectors JSONB takes priority if admin has overridden them
   const dbSelectors = source.selectors ?? {};
   const config = {
     ...codeConfig,
-    scraper_type:  effectiveScraperType,
+    scraper_type:  source.scraper_type,
     rateLimitMs:   source.rate_limit_ms ?? codeConfig.rateLimitMs ?? 2000,
     urls:          (source.url_patterns?.length > 0 ? source.url_patterns : null) ?? codeConfig.urls ?? [source.base_url],
     maxPages:      codeConfig.maxPages ?? 2,
@@ -128,7 +122,7 @@ async function runScrapeJob(source, triggeredBy = null) {
     // ── 3. Run the right scraper ────────────────────────────────────────
     let rawImages;
 
-    if (effectiveScraperType === 'playwright') {
+    if (source.scraper_type === 'playwright') {
       rawImages = await runPlaywrightScraper(config, config.maxPages, (msg) => logger.log(msg));
     } else {
       rawImages = await runCheerioScraper(config, config.maxPages, (msg) => logger.log(msg));
