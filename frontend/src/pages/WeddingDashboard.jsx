@@ -62,7 +62,7 @@ export default function WeddingDashboard({ onSelectWedding }) {
   const S = {
     page: { minHeight:'100vh', background:'var(--cream)', fontFamily:"'Jost',sans-serif" },
     header: { background:'var(--maroon)', padding:'16px 28px', display:'flex', justifyContent:'space-between', alignItems:'center' },
-    logo: { fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:'var(--gold)', fontWeight:700 },
+    logo: { fontFamily:"'Cormorant Garamond',serif", fontSize:24, color:'var(--gold)', fontWeight:700 },
     greeting: { fontSize:12, color:'rgba(232,201,122,0.6)', marginTop:2 },
     body: { maxWidth:900, margin:'0 auto', padding:'32px 20px' },
     title: { fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:'var(--maroon)', marginBottom:6 },
@@ -81,10 +81,10 @@ export default function WeddingDashboard({ onSelectWedding }) {
           <div style={S.greeting}>Welcome back, {profile?.full_name?.split(' ')[0] ?? 'there'} <FiUserCheck style={{ verticalAlign:'middle' }} /></div>
         </div>
         <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-          <button onClick={() => navigate('/')} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:12, padding:'7px 14px', cursor:'pointer', fontFamily:"'Jost',sans-serif" }}>
+          <button onClick={() => navigate('/')} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:999, color:'rgba(232,201,122,0.7)', fontSize:12, padding:'8px 14px', cursor:'pointer', fontFamily:"'Jost',sans-serif" }}>
             Home
           </button>
-          <button onClick={signOut} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:12, padding:'7px 14px', cursor:'pointer', fontFamily:"'Jost',sans-serif" }}>
+          <button onClick={signOut} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:999, color:'rgba(232,201,122,0.7)', fontSize:12, padding:'8px 14px', cursor:'pointer', fontFamily:"'Jost',sans-serif" }}>
             Sign out
           </button>
         </div>

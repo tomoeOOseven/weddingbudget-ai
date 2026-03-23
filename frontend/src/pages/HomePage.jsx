@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiArrowRight, FiGift, FiLogIn, FiMapPin, FiPlayCircle, FiUsers } from 'react-icons/fi';
+import { FiArrowLeft, FiArrowRight, FiGift, FiHome, FiLogIn, FiPlayCircle, FiUsers } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchHomepageContent } from '../api.js';
 
@@ -36,7 +36,7 @@ const FALLBACK_GAMES = [
 ];
 
 const TABS = [
-  { id: 'problem', label: 'Planning Reality', icon: <FiMapPin /> },
+  { id: 'problem', label: 'Home', icon: <FiHome /> },
   { id: 'games', label: 'Wedding Games', icon: <FiGift /> },
   { id: 'cards', label: 'Card Designs', icon: <FiPlayCircle /> },
 ];
@@ -47,16 +47,17 @@ function TabButton({ active, icon, label, onClick }) {
       onClick={onClick}
       style={{
         border: 'none',
-        borderRadius: 999,
-        background: active ? '#6B1E3A' : '#fff',
-        color: active ? '#E8C97A' : '#5a3543',
-        padding: '10px 16px',
+        background: 'transparent',
+        color: active ? '#E8C97A' : 'rgba(232,201,122,0.72)',
+        padding: '10px 16px 9px',
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 700,
-        boxShadow: active ? '0 10px 20px rgba(107, 30, 58, 0.25)' : '0 1px 5px rgba(0,0,0,0.08)',
+        letterSpacing: '1px',
+        textTransform: 'uppercase',
+        borderBottom: active ? '2px solid var(--gold)' : '2px solid transparent',
         cursor: 'pointer',
       }}
     >
@@ -103,6 +104,7 @@ export default function HomePage() {
 
   function handleWheel(e) {
     e.preventDefault();
+    e.stopPropagation();
     const now = Date.now();
     if (now - wheelRef.current < 300) return;
     wheelRef.current = now;
@@ -162,13 +164,13 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 20px 48px' }}>
-        <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-          {TABS.map((tab) => (
-            <TabButton key={tab.id} active={activeTab === tab.id} icon={tab.icon} label={tab.label} onClick={() => setActiveTab(tab.id)} />
-          ))}
-        </section>
+      <div style={{ background: 'var(--maroon-dark)', borderBottom: '1px solid rgba(232,201,122,0.18)', display: 'flex', gap: 2, flexWrap: 'wrap', padding: '0 28px' }}>
+        {TABS.map((tab) => (
+          <TabButton key={tab.id} active={activeTab === tab.id} icon={tab.icon} label={tab.label} onClick={() => setActiveTab(tab.id)} />
+        ))}
+      </div>
 
+      <main style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 20px 48px' }}>
         <section style={{ background: '#fff', border: '1px solid #e4d6c0', borderRadius: 18, padding: '22px 18px', boxShadow: '0 6px 24px rgba(89,35,50,0.08)' }}>
           {activeTab === 'problem' && (
             <div>
@@ -218,11 +220,9 @@ export default function HomePage() {
               <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Fun Wedding Games</h2>
               <div style={{ display: 'grid', gap: 14, marginTop: 14 }}>
                 {games.map((game, i) => (
-                  <article key={`${game.title}-${i}`} style={{ border: '1px solid #ecdcc4', borderRadius: 14, background: '#fffdf9', overflow: 'hidden', display: 'grid', gridTemplateColumns: '200px 1fr', alignItems: 'stretch', maxWidth: 840, margin: '0 auto' }}>
-                    <div style={{ background: '#f2e8d8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
-                      <img src={game.imageUrl} alt={game.title} style={{ width: '100%', height: 126, objectFit: 'contain', display: 'block', borderRadius: 8 }} />
-                    </div>
-                    <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <article key={`${game.title}-${i}`} style={{ border: '1px solid #ecdcc4', borderRadius: 14, background: '#fffdf9', overflow: 'hidden' }}>
+                    <img src={game.imageUrl} alt={game.title} style={{ width: '100%', height: 'clamp(180px, 33vw, 290px)', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ padding: '12px 14px' }}>
                       <div style={{ fontWeight: 800, color: '#6B1E3A', marginBottom: 4 }}>{game.title}</div>
                       <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.6 }}>{game.desc}</div>
                     </div>
@@ -236,8 +236,8 @@ export default function HomePage() {
             <div>
               <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Wedding Card Designs</h2>
 
-              <div style={{ position: 'relative' }} onWheel={handleWheel}>
-                <div style={{ overflow: 'hidden', borderRadius: 14, border: '1px solid #ead7be', background: '#f8efe1' }}>
+              <div style={{ position: 'relative', overscrollBehavior: 'contain' }} onWheelCapture={handleWheel}>
+                <div style={{ overflow: 'hidden', borderRadius: 14, border: '1px solid #ead7be', background: '#f8efe1', overscrollBehavior: 'contain' }}>
                   <div
                     style={{
                       display: 'flex',
@@ -248,7 +248,7 @@ export default function HomePage() {
                   >
                     {cardDesigns.map((card, i) => (
                       <div key={`${card.canvaUrl}-${i}`} style={{ width: `${100 / cardDesigns.length}%`, padding: 12, flexShrink: 0 }}>
-                        <a href={card.canvaUrl} target="_blank" rel="noreferrer" title="Open design in Canva" style={{ display: 'block' }}>
+                        <a href={card.canvaUrl} target="_blank" rel="noreferrer" title="Open design in Canva" style={{ display: 'block' }} onWheelCapture={handleWheel}>
                           <img
                             src={card.imageUrl}
                             alt={`Wedding card design ${i + 1}`}
@@ -285,9 +285,9 @@ export default function HomePage() {
 
       <footer style={{ borderTop: '1px solid #e1ceb3', background: 'rgba(251,245,230,0.96)', padding: '18px 28px 20px' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
-          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: '#6B1E3A', marginBottom: 6 }}>About Events By Athea</div>
+          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: '#6B1E3A', marginBottom: 6 }}>About us</div>
           <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.8 }}>
-            <strong>Company:</strong> Events By Athea &nbsp;|&nbsp; <strong>Category:</strong> Event Planner &nbsp;|&nbsp; <strong>Speciality:</strong> Bespoke Wedding Designers and Luxury Events &nbsp;|&nbsp; <strong>Founder:</strong> @shubhiagrawal08
+            Events By Athea creates bespoke wedding and luxury event experiences. Follow on Instagram: <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ color: '#6B1E3A', fontWeight: 700, textDecoration: 'none' }}>@eventsbyathea</a>
           </div>
         </div>
       </footer>
