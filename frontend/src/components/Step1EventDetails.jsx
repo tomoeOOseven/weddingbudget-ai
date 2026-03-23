@@ -69,7 +69,7 @@ export default function Step1EventDetails({ inputs, set, toggle, refData, cm, hd
           </div>
           <div>
             <Label>Outstation Guests: {inputs.outstationPct}%</Label>
-            <input type="range" min={0} max={100} value={inputs.outstationPct}
+            <input type="range" min={0} max={100} step={10} value={inputs.outstationPct}
               onChange={e => set('outstationPct', +e.target.value)} />
             <SubText>{Math.round(inputs.guests * inputs.outstationPct / 100)} guests need airport/station transfers</SubText>
           </div>

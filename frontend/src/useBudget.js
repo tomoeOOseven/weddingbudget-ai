@@ -17,7 +17,7 @@ function createInitialInputs() {
   transfers:   true,
   ghodi:       true,
   dholis:      2,
-  sfx:         new Set(['pyro']),
+  sfx:         new Set(['cold-pyro']),
   roomBaskets: true,
   rituals:     true,
   gifts:       true,
@@ -46,6 +46,12 @@ export function serializeBudgetInputs(inputs) {
 
 export function normalizeBudgetInputs(raw = {}) {
   const initial = createInitialInputs();
+  const normalizedSfx = ensureSet(raw.sfx, initial.sfx);
+  if (normalizedSfx.has('pyro') && !normalizedSfx.has('cold-pyro')) {
+    normalizedSfx.delete('pyro');
+    normalizedSfx.add('cold-pyro');
+  }
+
   return {
     city: raw.city ?? initial.city,
     hotelTier: raw.hotelTier ?? initial.hotelTier,
@@ -61,7 +67,7 @@ export function normalizeBudgetInputs(raw = {}) {
     transfers: typeof raw.transfers === 'boolean' ? raw.transfers : initial.transfers,
     ghodi: typeof raw.ghodi === 'boolean' ? raw.ghodi : initial.ghodi,
     dholis: Number.isFinite(Number(raw.dholis)) ? Number(raw.dholis) : initial.dholis,
-    sfx: ensureSet(raw.sfx, initial.sfx),
+    sfx: normalizedSfx,
     roomBaskets: typeof raw.roomBaskets === 'boolean' ? raw.roomBaskets : initial.roomBaskets,
     rituals: typeof raw.rituals === 'boolean' ? raw.rituals : initial.rituals,
     gifts: typeof raw.gifts === 'boolean' ? raw.gifts : initial.gifts,

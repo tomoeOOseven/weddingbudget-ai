@@ -16,7 +16,51 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { FiAlertTriangle, FiLoader } from 'react-icons/fi';
 
 const ACTIVE_WEDDING_KEY = 'wdtch_active_wedding_id';
+const ACTIVE_WEDDING_CACHE_KEY = 'wdtch_active_wedding_cache';
 const WEDDING_STATE_PREFIX = 'wdtch_wedding_state_';
+const WEDDING_STEP_PREFIX = 'wdtch_wedding_step_';
+const GUEST_STEP_KEY = 'wdtch_guest_step';
+
+function normalizeStep(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  const clamped = Math.max(1, Math.min(7, Math.floor(n)));
+  return clamped;
+}
+
+function getStepStorageKey(weddingId) {
+  return weddingId ? `${WEDDING_STEP_PREFIX}${weddingId}` : GUEST_STEP_KEY;
+}
+
+function getStoredStep(weddingId) {
+  try {
+    return normalizeStep(localStorage.getItem(getStepStorageKey(weddingId)));
+  } catch {
+    return 1;
+  }
+}
+
+function cacheActiveWedding(wedding) {
+  if (!wedding?.id) return;
+  try {
+    localStorage.setItem(ACTIVE_WEDDING_CACHE_KEY, JSON.stringify({ id: wedding.id, name: wedding.name ?? 'Wedding Project' }));
+  } catch {
+    // ignore storage exceptions
+  }
+}
+
+function getCachedActiveWedding(expectedId) {
+  try {
+    const raw = localStorage.getItem(ACTIVE_WEDDING_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.id) return null;
+    if (expectedId && parsed.id !== expectedId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 function parseWeddingNotes(notes) {
   if (!notes || typeof notes !== 'string') return null;
@@ -66,6 +110,21 @@ export default function App() {
 
   const { inputs, set, toggle, hydrateInputs, resetInputs, step, setStep, budget, cm, hd } = useBudget(refData);
 
+  const handleSelectWedding = (wedding) => {
+    const selected = wedding ?? {};
+    if (wedding?.id) {
+      localStorage.setItem(ACTIVE_WEDDING_KEY, wedding.id);
+      setQueryWeddingId(wedding.id);
+      cacheActiveWedding(wedding);
+      setStep(getStoredStep(wedding.id));
+    } else {
+      localStorage.removeItem(ACTIVE_WEDDING_KEY);
+      setQueryWeddingId(null);
+      setStep(getStoredStep(null));
+    }
+    setActiveWedding(selected);
+  };
+
   useEffect(() => {
     if (authLoading || !user || isAdmin) {
       setWeddingHydrationDone(true);
@@ -80,8 +139,16 @@ export default function App() {
 
     setHydratingWedding(true);
     fetchWedding(rememberedWeddingId)
-      .then((wedding) => setActiveWedding(wedding))
+      .then((wedding) => {
+        setActiveWedding(wedding);
+        cacheActiveWedding(wedding);
+      })
       .catch(() => {
+        const cached = getCachedActiveWedding(rememberedWeddingId);
+        if (cached) {
+          setActiveWedding(cached);
+          return;
+        }
         localStorage.removeItem(ACTIVE_WEDDING_KEY);
         setQueryWeddingId(null);
       })
@@ -100,13 +167,13 @@ export default function App() {
       setQueryWeddingId(null);
       if (activeWedding === null) {
         resetInputs();
-        setStep(1);
       }
       return;
     }
 
     localStorage.setItem(ACTIVE_WEDDING_KEY, weddingId);
     setQueryWeddingId(weddingId);
+    cacheActiveWedding(activeWedding);
 
     const noteState = parseWeddingNotes(activeWedding.notes);
     const localStateRaw = localStorage.getItem(`${WEDDING_STATE_PREFIX}${weddingId}`);
@@ -127,8 +194,13 @@ export default function App() {
     });
 
     hydrateInputs(merged);
-    setStep(1);
+    setStep(getStoredStep(weddingId));
   }, [user, activeWedding?.id, weddingHydrationDone]);
+
+  useEffect(() => {
+    if (!weddingHydrationDone || activeWedding === null) return;
+    localStorage.setItem(getStepStorageKey(activeWedding?.id ?? null), String(normalizeStep(step)));
+  }, [step, activeWedding?.id, activeWedding, weddingHydrationDone]);
 
   useEffect(() => {
     if (!user || !activeWedding?.id) return;
@@ -164,7 +236,7 @@ export default function App() {
 
   // Logged in but haven't selected a wedding yet
   if (user && activeWedding === null && weddingHydrationDone) {
-    return <WeddingDashboard onSelectWedding={(w) => setActiveWedding(w ?? {})} />;
+    return <WeddingDashboard onSelectWedding={handleSelectWedding} />;
   }
 
   // Data loading
