@@ -45,7 +45,7 @@ const DEFAULT_HOMEPAGE_CONTENT = {
     {
       title: 'Ring Hunt Challenge',
       desc: 'Bride and groom search for the hidden ring in a playful bowl game with full family commentary.',
-      imageUrl: '/games/game-4.jpg',
+      imageUrl: '/games/game-4.webp',
     },
   ],
 };

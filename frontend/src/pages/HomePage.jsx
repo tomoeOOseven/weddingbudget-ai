@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiArrowRight, FiExternalLink, FiGift, FiLogIn, FiMapPin, FiPlayCircle, FiUsers } from 'react-icons/fi';
+import { FiArrowLeft, FiArrowRight, FiGift, FiLogIn, FiMapPin, FiPlayCircle, FiUsers } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchHomepageContent } from '../api.js';
 
@@ -31,12 +31,12 @@ const FALLBACK_GAMES = [
   {
     title: 'Ring Hunt Challenge',
     desc: 'Bride and groom search for the hidden ring in a playful bowl game with full family commentary.',
-    imageUrl: '/games/game-4.jpg',
+    imageUrl: '/games/game-4.webp',
   },
 ];
 
 const TABS = [
-  { id: 'problem', label: 'Why This Matters', icon: <FiMapPin /> },
+  { id: 'problem', label: 'Planning Reality', icon: <FiMapPin /> },
   { id: 'games', label: 'Wedding Games', icon: <FiGift /> },
   { id: 'cards', label: 'Card Designs', icon: <FiPlayCircle /> },
 ];
@@ -47,17 +47,16 @@ function TabButton({ active, icon, label, onClick }) {
       onClick={onClick}
       style={{
         border: 'none',
-        background: 'transparent',
-        color: active ? '#E8C97A' : 'rgba(232,201,122,0.72)',
-        padding: '10px 16px 9px',
+        borderRadius: 999,
+        background: active ? '#6B1E3A' : '#fff',
+        color: active ? '#E8C97A' : '#5a3543',
+        padding: '10px 16px',
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '1px',
-        textTransform: 'uppercase',
-        borderBottom: active ? '2px solid var(--gold)' : '2px solid transparent',
+        boxShadow: active ? '0 10px 20px rgba(107, 30, 58, 0.25)' : '0 1px 5px rgba(0,0,0,0.08)',
         cursor: 'pointer',
       }}
     >
@@ -68,7 +67,7 @@ function TabButton({ active, icon, label, onClick }) {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('problem');
   const [cardIndex, setCardIndex] = useState(0);
   const [cardDesigns, setCardDesigns] = useState(FALLBACK_CARD_DESIGNS);
@@ -115,7 +114,12 @@ export default function HomePage() {
     <div style={{ minHeight: '100vh', background: 'var(--cream)', color: '#2D1520', fontFamily: "'Jost',sans-serif" }}>
       <header
         style={{
-          background: 'var(--maroon)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          background: 'rgba(251,245,230,0.96)',
+          backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid #e6d6bf',
           padding: '16px 28px',
           display: 'flex',
           justifyContent: 'space-between',
@@ -125,41 +129,46 @@ export default function HomePage() {
         }}
       >
         <div>
-          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 700, color: '#E8C97A' }}>
+          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 700, color: '#6B1E3A' }}>
             WeddingBudget<span style={{ color: '#C4973D' }}>.ai</span>
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(232,201,122,0.6)', letterSpacing: '2.5px', textTransform: 'uppercase', fontWeight: 300 }}>
+          <div style={{ fontSize: 10, color: '#7A5563', letterSpacing: '2.5px', textTransform: 'uppercase', fontWeight: 400 }}>
             Events By Athea x AI Budget Intelligence
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {isAdmin && (
-            <button onClick={() => navigate('/admin')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(232,201,122,0.3)', borderRadius: 7, color: 'rgba(232,201,122,0.75)', padding: '7px 12px', fontWeight: 700, fontSize: 12 }}>
+            <button onClick={() => navigate('/admin')} style={{ border: '1px solid #d6c4aa', background: '#fff', color: '#6B1E3A', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
               Admin Console
             </button>
           )}
           {loading ? (
-            <span style={{ color: 'rgba(232,201,122,0.75)', fontSize: 12 }}>Checking session...</span>
+            <span style={{ color: '#7A5563', fontSize: 12 }}>Checking session...</span>
           ) : user ? (
-            <button onClick={() => navigate('/app')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(232,201,122,0.3)', borderRadius: 7, color: 'rgba(232,201,122,0.85)', padding: '7px 12px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <FiUsers /> My Weddings
-            </button>
+            <>
+              <button onClick={() => navigate('/app')} style={{ border: 'none', background: '#6B1E3A', color: '#E8C97A', borderRadius: 999, padding: '9px 16px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <FiUsers /> My Weddings
+              </button>
+              <button onClick={signOut} style={{ border: '1px solid #d6c4aa', background: '#fff', color: '#6B1E3A', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                Sign out
+              </button>
+            </>
           ) : (
-            <button onClick={() => navigate('/login')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(232,201,122,0.3)', borderRadius: 7, color: 'rgba(232,201,122,0.85)', padding: '7px 12px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => navigate('/login')} style={{ border: 'none', background: '#6B1E3A', color: '#E8C97A', borderRadius: 999, padding: '9px 16px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <FiLogIn /> Sign In
             </button>
           )}
         </div>
       </header>
 
-      <div style={{ background: 'var(--maroon-dark)', borderBottom: '1px solid rgba(232,201,122,0.18)', display: 'flex', gap: 2, flexWrap: 'wrap', padding: '0 28px' }}>
-        {TABS.map((tab) => (
-          <TabButton key={tab.id} active={activeTab === tab.id} icon={tab.icon} label={tab.label} onClick={() => setActiveTab(tab.id)} />
-        ))}
-      </div>
-
       <main style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 20px 48px' }}>
+        <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+          {TABS.map((tab) => (
+            <TabButton key={tab.id} active={activeTab === tab.id} icon={tab.icon} label={tab.label} onClick={() => setActiveTab(tab.id)} />
+          ))}
+        </section>
+
         <section style={{ background: '#fff', border: '1px solid #e4d6c0', borderRadius: 18, padding: '22px 18px', boxShadow: '0 6px 24px rgba(89,35,50,0.08)' }}>
           {activeTab === 'problem' && (
             <div>
@@ -187,9 +196,6 @@ export default function HomePage() {
                   <button onClick={() => navigate('/app')} style={{ background: '#E8C97A', color: '#3f1222', border: 'none', borderRadius: 9, padding: '11px 16px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
                     Start Estimating
                   </button>
-                  <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ background: 'transparent', color: '#E8C97A', border: '1px solid rgba(232,201,122,0.5)', borderRadius: 9, padding: '10px 14px', fontWeight: 700, fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                    <FiExternalLink /> Events By Athea
-                  </a>
                 </div>
               </section>
 
@@ -212,9 +218,11 @@ export default function HomePage() {
               <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, marginBottom: 8, color: '#2D1520' }}>Fun Wedding Games</h2>
               <div style={{ display: 'grid', gap: 14, marginTop: 14 }}>
                 {games.map((game, i) => (
-                  <article key={`${game.title}-${i}`} style={{ border: '1px solid #ecdcc4', borderRadius: 14, background: '#fffdf9', overflow: 'hidden' }}>
-                    <img src={game.imageUrl} alt={game.title} style={{ width: '100%', height: 'clamp(180px, 33vw, 290px)', objectFit: 'cover', display: 'block' }} />
-                    <div style={{ padding: '12px 14px' }}>
+                  <article key={`${game.title}-${i}`} style={{ border: '1px solid #ecdcc4', borderRadius: 14, background: '#fffdf9', overflow: 'hidden', display: 'grid', gridTemplateColumns: '200px 1fr', alignItems: 'stretch', maxWidth: 840, margin: '0 auto' }}>
+                    <div style={{ background: '#f2e8d8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+                      <img src={game.imageUrl} alt={game.title} style={{ width: '100%', height: 126, objectFit: 'contain', display: 'block', borderRadius: 8 }} />
+                    </div>
+                    <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <div style={{ fontWeight: 800, color: '#6B1E3A', marginBottom: 4 }}>{game.title}</div>
                       <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.6 }}>{game.desc}</div>
                     </div>
@@ -273,28 +281,16 @@ export default function HomePage() {
             </div>
           )}
         </section>
-
-        <section style={{ marginTop: 22, borderRadius: 18, border: '1px solid #e4d6c0', background: '#fff', padding: '20px 18px', boxShadow: '0 6px 24px rgba(89,35,50,0.08)' }}>
-          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, marginBottom: 8, color: '#2D1520' }}>About Events By Athea</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, marginTop: 14 }}>
-            {[
-              { k: 'Company', v: 'Events By Athea' },
-              { k: 'Category', v: 'Event Planner' },
-              { k: 'Speciality', v: 'Bespoke Wedding Designers and Luxury Events' },
-              { k: 'Founder', v: '@shubhiagrawal08' },
-              { k: 'Recognition', v: 'ET Panache Women of the Year' },
-            ].map((item) => (
-              <div key={item.k} style={{ border: '1px solid #ecdcc4', borderRadius: 12, padding: '12px 14px', background: '#fffdf9' }}>
-                <div style={{ fontSize: 11, color: '#7A5563', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{item.k}</div>
-                <div style={{ fontWeight: 700, color: '#3f1222' }}>{item.v}</div>
-              </div>
-            ))}
-          </div>
-          <a href="https://www.instagram.com/eventsbyathea/" target="_blank" rel="noreferrer" style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: '#6B1E3A', fontWeight: 700 }}>
-            <FiMapPin /> Visit Instagram Profile
-          </a>
-        </section>
       </main>
+
+      <footer style={{ borderTop: '1px solid #e1ceb3', background: 'rgba(251,245,230,0.96)', padding: '18px 28px 20px' }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: '#6B1E3A', marginBottom: 6 }}>About Events By Athea</div>
+          <div style={{ color: '#5a3543', fontSize: 14, lineHeight: 1.8 }}>
+            <strong>Company:</strong> Events By Athea &nbsp;|&nbsp; <strong>Category:</strong> Event Planner &nbsp;|&nbsp; <strong>Speciality:</strong> Bespoke Wedding Designers and Luxury Events &nbsp;|&nbsp; <strong>Founder:</strong> @shubhiagrawal08
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

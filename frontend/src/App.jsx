@@ -42,7 +42,7 @@ function setQueryWeddingId(id) {
 }
 
 export default function App() {
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const [refData, setRefData]   = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -200,9 +200,14 @@ export default function App() {
             Home
           </button>
           {user ? (
-            <button onClick={() => setActiveWedding(null)} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
-              ← My Weddings
-            </button>
+            <>
+              <button onClick={() => setActiveWedding(null)} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
+                ← My Weddings
+              </button>
+              <button onClick={signOut} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
+                Sign out
+              </button>
+            </>
           ) : (
             <button onClick={() => navigate('/login')} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:7, color:'rgba(232,201,122,0.7)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
               Sign in
