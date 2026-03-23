@@ -161,6 +161,72 @@ const SITE_CONFIGS = {
     priceSelector: '[class*="price"], [class*="starting"]',
     minImageW: 220,
   },
+
+  'https://weddingz.in': {
+    scraper: 'cheerio',
+    urls: ['https://weddingz.in'],
+    maxPages: 3,
+    imageSelector: 'img',
+    titleSelector: 'h1, h2, h3, h4, [class*="title"], [class*="name"]',
+    descSelector: 'p, [class*="desc"], [class*="summary"], [class*="location"]',
+    priceSelector: '[class*="price"], [class*="starting"]',
+    minImageW: 220,
+  },
+
+  'https://www.weddingplz.com': {
+    scraper: 'cheerio',
+    urls: ['https://www.weddingplz.com'],
+    maxPages: 3,
+    imageSelector: 'img',
+    titleSelector: 'h1, h2, h3, h4, [class*="title"], [class*="name"]',
+    descSelector: 'p, [class*="desc"], [class*="summary"], [class*="location"]',
+    priceSelector: '[class*="price"], [class*="starting"]',
+    minImageW: 220,
+  },
+
+  'https://www.mandap.com': {
+    scraper: 'cheerio',
+    urls: ['https://www.mandap.com'],
+    maxPages: 3,
+    imageSelector: 'img',
+    titleSelector: 'h1, h2, h3, h4, [class*="title"], [class*="name"]',
+    descSelector: 'p, [class*="desc"], [class*="summary"], [class*="location"]',
+    priceSelector: '[class*="price"], [class*="starting"]',
+    minImageW: 220,
+  },
+
+  'https://www.bigindianwedding.com': {
+    scraper: 'cheerio',
+    urls: ['https://www.bigindianwedding.com'],
+    maxPages: 3,
+    imageSelector: 'img',
+    titleSelector: 'h1, h2, h3, h4, [class*="title"], [class*="name"]',
+    descSelector: 'p, [class*="desc"], [class*="summary"], [class*="location"]',
+    priceSelector: '[class*="price"], [class*="starting"]',
+    minImageW: 220,
+  },
+
+  'https://www.shaadidukaan.com': {
+    scraper: 'cheerio',
+    urls: ['https://www.shaadidukaan.com'],
+    maxPages: 3,
+    imageSelector: 'img',
+    titleSelector: 'h1, h2, h3, h4, [class*="title"], [class*="name"]',
+    descSelector: 'p, [class*="desc"], [class*="summary"], [class*="location"]',
+    priceSelector: '[class*="price"], [class*="starting"]',
+    minImageW: 220,
+  },
+
+  'https://www.eventila.com': {
+    scraper: 'cheerio',
+    urls: ['https://www.eventila.com'],
+    maxPages: 3,
+    imageSelector: 'img',
+    titleSelector: 'h1, h2, h3, h4, [class*="title"], [class*="name"]',
+    descSelector: 'p, [class*="desc"], [class*="summary"], [class*="location"]',
+    priceSelector: '[class*="price"], [class*="starting"]',
+    minImageW: 220,
+  },
 };
 
 module.exports = { SITE_CONFIGS };

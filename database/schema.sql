@@ -1062,9 +1062,13 @@ insert into public.scrape_sources (name, base_url, scraper_type, rate_limit_ms) 
   ('WeddingDoers',      'https://www.weddingdoers.com',        'cheerio',    1500),
   ('MyWeddingBazaar',   'https://www.myweddingbazaar.com',     'cheerio',    1500),
   ('WedNorth',          'https://www.wednorth.com',            'cheerio',    1500),
+  ('WeddingPlz',        'https://www.weddingplz.com',          'cheerio',    1500),
+  ('Mandap.com',        'https://www.mandap.com',              'cheerio',    1500),
+  ('BigIndianWedding.com', 'https://www.bigindianwedding.com', 'cheerio',    1500),
+  ('ShaadiDukaan',      'https://www.shaadidukaan.com',        'cheerio',    1500),
+  ('Eventila',          'https://www.eventila.com',            'cheerio',    1500),
   ('DreamzCraft',       'https://www.dreamzcraftweddings.com', 'playwright', 2000),
   ('Sabyasachi Decor Blog','https://www.sabyasachi.com',       'playwright', 3000),
   ('Pinterest (Wedding Decor)', 'https://www.pinterest.com',  'playwright', 3000),
   ('Vogue India Weddings','https://www.vogue.in',              'playwright', 2500),
-  ('Brides Today',      'https://www.bridestoday.in',          'cheerio',    1500),
-  ('BridalAffair',      'https://www.bridalaffair.in',         'cheerio',    1500);
+  ('Brides Today',      'https://www.bridestoday.in',          'cheerio',    1500);
