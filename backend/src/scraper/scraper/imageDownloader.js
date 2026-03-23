@@ -17,6 +17,18 @@ const STORAGE_BUCKET = 'decor-images';
 const DOWNLOAD_TIMEOUT_MS = 15000;
 const MAX_FILE_SIZE_BYTES  = 8 * 1024 * 1024; // 8 MB — skip oversized images
 
+function parsePriceInr(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (/price\s*on\s*request/i.test(text)) return null;
+  const match = text.match(/(?:₹|Rs\.?|INR)?\s*([\d,]{3,})/i);
+  if (!match?.[1]) return null;
+  const digits = match[1].replace(/[^\d]/g, '');
+  if (!digits) return null;
+  const n = Number.parseInt(digits, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 // ── Perceptual hash (average hash / aHash) ─────────────────────────────────
 // 1. Resize to 8x8 grayscale  →  64 pixels
 // 2. Compute mean pixel value
@@ -201,6 +213,8 @@ async function batchDownloadAndStore(images, sourceSlug, sourceId, jobId, minWid
             title:          img.title   ?? null,
             description:    img.description ?? null,
             scraped_tags:   img.scrapedTags ?? [],
+            price_text:     img.priceText ?? null,
+            price_inr:      parsePriceInr(img.priceText),
             image_hash:     result.imageHash,
             width_px:       result.widthPx,
             height_px:      result.heightPx,

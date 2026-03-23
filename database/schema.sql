@@ -443,6 +443,8 @@ create table public.scraped_images (
   title             text,                                 -- scraped title/alt text
   description       text,                                 -- scraped description
   scraped_tags      jsonb not null default '[]',          -- any tags found on the source site
+  price_text        text,                                 -- scraped price string from source page
+  price_inr         integer,                              -- parsed integer INR value when available
   image_hash        text,                                 -- perceptual hash for dedup
   width_px          integer,
   height_px         integer,

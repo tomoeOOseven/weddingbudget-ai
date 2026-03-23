@@ -419,6 +419,10 @@ export default function AdminLabelling() {
   const LIMIT = 24;
   const BATCH_LIMIT = 50;
 
+  const rawCount = Number(stats.totalRaw ?? stats.queueCount ?? 0);
+  const pendingCount = Number(stats.pendingSuggestions ?? 0);
+  const modeAwareQueueCount = bypass ? rawCount : (rawCount + pendingCount);
+
   const loadStats = useCallback(async () => {
     try { setStats(await apiFetch('/api/labelling/stats')); } catch {}
   }, []);
@@ -618,7 +622,7 @@ export default function AdminLabelling() {
 
       {/* Stats */}
       <div style={S.stats}>
-        <StatPill label="Awaiting Label"    value={stats.queueCount ?? 0}    color="#b45309" />
+        <StatPill label={bypass ? 'Awaiting Label' : 'Awaiting Review/Label'} value={modeAwareQueueCount} color="#b45309" />
         <StatPill label="Labelled Images"   value={stats.totalLabelled}      color="#15803d" />
         <StatPill label="In Training Set"   value={stats.inTraining}         color="#7a1c1c" />
         <StatPill label="Pending Sign-off"  value={stats.pendingSuggestions} color="#6d28d9" />
