@@ -7,6 +7,8 @@
 const axios = require('axios');
 
 const ML_URL = String(process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+const ML_PIPELINE_ENABLED = String(process.env.ML_PIPELINE_ENABLED || '').toLowerCase() === 'true'
+  || process.env.ML_PIPELINE_ENABLED === '1';
 const TIMEOUT = 30000;
 const TRANSIENT_STATUS_CODES = new Set([429, 502, 503, 504]);
 
@@ -56,6 +58,10 @@ async function probeHealth(baseUrl, attempts = 3) {
  * @returns {object} { cost_min, cost_max, cost_mid, confidence, source, version_id }
  */
 async function predictCost(params) {
+  if (!ML_PIPELINE_ENABLED) {
+    return null;
+  }
+
   try {
     const { data } = await axios.post(`${ML_URL}/predict`, {
       image_id:         params.imageId       ?? null,
@@ -82,6 +88,10 @@ async function predictCost(params) {
  * Fire-and-forget — does not wait for completion.
  */
 async function embedImage(imageId, imageUrl, storagePath = null) {
+  if (!ML_PIPELINE_ENABLED) {
+    return false;
+  }
+
   try {
     await axios.post(`${ML_URL}/embed`, {
       image_id:     imageId,
@@ -103,6 +113,10 @@ async function embedImage(imageId, imageUrl, storagePath = null) {
  * @param {string|null} forceAlgorithm — force one algorithm name for this run
  */
 async function triggerTraining(versionLabel, triggeredBy = null, forceBestModel = null, forceAlgorithm = null) {
+  if (!ML_PIPELINE_ENABLED) {
+    return null;
+  }
+
   try {
     const { data } = await axios.post(`${ML_URL}/train`, {
       version_label: versionLabel,
@@ -121,6 +135,10 @@ async function triggerTraining(versionLabel, triggeredBy = null, forceBestModel 
  * Get active model status and recent version history.
  */
 async function getModelStatus() {
+  if (!ML_PIPELINE_ENABLED) {
+    return null;
+  }
+
   try {
     const { data } = await axios.get(`${ML_URL}/model/status`, { timeout: 5000 });
     return data;
@@ -133,6 +151,15 @@ async function getModelStatus() {
  * Health check — is the ML service running?
  */
 async function checkHealth() {
+  if (!ML_PIPELINE_ENABLED) {
+    return {
+      available: false,
+      checked_url: null,
+      disabled: true,
+      error: 'ML pipeline disabled by ML_PIPELINE_ENABLED',
+    };
+  }
+
   const primary = trimTrailingSlash(ML_URL);
   const probe = await probeHealth(primary, 3);
 
