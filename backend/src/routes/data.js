@@ -3,13 +3,33 @@ const express = require('express');
 const router  = express.Router();
 const { supabase } = require('../lib/supabaseClient');
 
+function derivePriceRangeTag(priceInr) {
+  if (!Number.isFinite(Number(priceInr))) return null;
+  const p = Number(priceInr);
+  if (p >= 1000 && p < 15000) return 'Budget';
+  if (p >= 15000 && p < 80000) return 'Mid-Range';
+  if (p >= 80000 && p <= 500000) return 'Premium';
+  return null;
+}
+
+function rangeBounds(tag, fallbackPrice) {
+  if (tag === 'Budget') return { min: 1000, max: 15000 };
+  if (tag === 'Mid-Range') return { min: 15000, max: 80000 };
+  if (tag === 'Premium') return { min: 80000, max: 500000 };
+  if (Number.isFinite(Number(fallbackPrice))) {
+    const p = Number(fallbackPrice);
+    return { min: Math.max(1000, Math.round(p * 0.9)), max: Math.round(p * 1.1) };
+  }
+  return null;
+}
+
 router.get('/all', async (req, res) => {
   try {
     const [
       { data: cities }, { data: hotelTiers }, { data: artists },
       { data: meals }, { data: barTiers }, { data: specialtyCounters },
       { data: logisticsRates }, { data: sfxItems }, { data: sundriesConfig },
-      { data: decor }, { data: eventFunctions },
+      { data: eventFunctions },
     ] = await Promise.all([
       supabase.from('cities').select('*').eq('is_active', true).order('label'),
       supabase.from('hotel_tiers').select('*').eq('is_active', true),
@@ -20,16 +40,15 @@ router.get('/all', async (req, res) => {
       supabase.from('logistics_rates').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1),
       supabase.from('sfx_items').select('*').eq('is_active', true),
       supabase.from('sundries_config').select('*').eq('is_active', true).order('version', { ascending: false }).limit(1),
-      supabase.from('decor_items').select('*').eq('is_active', true).order('function_type'),
       supabase.from('event_functions').select('id, slug, label, emoji, sort_order').eq('is_active', true).order('sort_order').order('label'),
     ]);
 
     const { data: scrapedDecor } = await supabase
       .from('scraped_images')
-      .select(`id, title, storage_path, image_url, image_labels ( function_type, style, complexity, cost_seed_min, cost_seed_max, confidence )`)
-      .eq('status', 'labelled')
+      .select(`id, title, storage_path, image_url, price_inr, price_text, price_range_tag, image_labels ( function_type, style, complexity, confidence )`)
+      .not('price_inr', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(300);
+      .limit(500);
 
     const L = logisticsRates?.[0];
     const S = sundriesConfig?.[0];
@@ -42,25 +61,27 @@ router.get('/all', async (req, res) => {
     const cityMap  = Object.fromEntries((cities ?? []).map(c => [c.slug, { mult: c.multiplier, label: c.label, region: c.region, id: c.id }]));
     const hotelMap = Object.fromEntries((hotelTiers ?? []).map(h => [h.slug, { label: h.label, roomRate: h.room_rate, costMult: h.cost_mult, decorMult: h.decor_mult, id: h.id }]));
 
-    const seedDecor = (decor ?? []).map(d => ({
-      id: d.id, slug: d.slug, label: d.label, function: d.function_type,
-      style: d.style, complexity: d.complexity, costMin: d.cost_min, costMax: d.cost_max,
-      imageUrl: d.image_url ? `${SURL}/storage/v1/object/public/decor-images/${d.image_url}` : null,
-      source: 'seed',
-    }));
-
     const scrapedMapped = (scrapedDecor ?? [])
-      .filter(img => img.image_labels?.length > 0)
       .map(img => {
-        const lbl = img.image_labels[0];
+        const lbl = img.image_labels?.[0] ?? {};
+        const priceRangeTag = img.price_range_tag || derivePriceRangeTag(img.price_inr);
+        const bounds = rangeBounds(priceRangeTag, img.price_inr);
+        if (!bounds) return null;
         return {
           id: img.id, label: img.title ?? 'Scraped Design',
-          function: lbl.function_type, style: lbl.style, complexity: lbl.complexity,
-          costMin: lbl.cost_seed_min, costMax: lbl.cost_seed_max, confidence: lbl.confidence,
+          function: lbl.function_type ?? 'other',
+          style: lbl.style ?? 'Traditional',
+          complexity: lbl.complexity ?? 'medium',
+          costMin: bounds.min,
+          costMax: bounds.max,
+          confidence: lbl.confidence ?? null,
+          priceInr: img.price_inr,
+          priceRangeTag,
           imageUrl: img.storage_path ? `${SURL}/storage/v1/object/public/decor-images/${img.storage_path}` : img.image_url,
           source: 'scraped',
         };
-      });
+      })
+      .filter(Boolean);
 
     res.json({
       cities: cityMap, hotelTiers: hotelMap,
@@ -91,7 +112,7 @@ router.get('/all', async (req, res) => {
         photographyMax: S.photography_max,
         contingencyPct: S.contingency_pct,
       },
-      decor: [...seedDecor, ...scrapedMapped],
+      decor: scrapedMapped,
       functions: (eventFunctions ?? []).map((fn) => ({ id: fn.slug, label: fn.label, emoji: fn.emoji })),
     });
   } catch (err) {

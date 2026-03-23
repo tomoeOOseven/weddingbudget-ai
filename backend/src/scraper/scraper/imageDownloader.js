@@ -29,6 +29,15 @@ function parsePriceInr(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function derivePriceRangeTag(priceInr) {
+  if (!Number.isFinite(Number(priceInr))) return null;
+  const p = Number(priceInr);
+  if (p >= 1000 && p < 15000) return 'Budget';
+  if (p >= 15000 && p < 80000) return 'Mid-Range';
+  if (p >= 80000 && p <= 500000) return 'Premium';
+  return null;
+}
+
 // ── Perceptual hash (average hash / aHash) ─────────────────────────────────
 // 1. Resize to 8x8 grayscale  →  64 pixels
 // 2. Compute mean pixel value
@@ -201,6 +210,7 @@ async function batchDownloadAndStore(images, sourceSlug, sourceId, jobId, minWid
           return { type: 'skip' };
         }
 
+        const parsedPriceInr = parsePriceInr(img.priceText);
         // Insert row into scraped_images
         const { error: insertError } = await supabaseAdmin
           .from('scraped_images')
@@ -214,7 +224,8 @@ async function batchDownloadAndStore(images, sourceSlug, sourceId, jobId, minWid
             description:    img.description ?? null,
             scraped_tags:   img.scrapedTags ?? [],
             price_text:     img.priceText ?? null,
-            price_inr:      parsePriceInr(img.priceText),
+            price_inr:      parsedPriceInr,
+            price_range_tag:derivePriceRangeTag(parsedPriceInr),
             image_hash:     result.imageHash,
             width_px:       result.widthPx,
             height_px:      result.heightPx,

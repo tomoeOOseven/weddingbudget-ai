@@ -86,14 +86,13 @@ function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Lab
     function_type: initial.function_type ?? '',
     style:         initial.style         ?? '',
     complexity:    initial.complexity    ?? '',
-    cost_seed_min: initial.cost_seed_min ?? '',
-    cost_seed_max: initial.cost_seed_max ?? '',
+    price_estimate: initial.price_estimate ?? '',
     notes:         initial.notes         ?? '',
   });
 
   const set   = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const valid = form.function_type && form.style && form.complexity &&
-    form.cost_seed_min !== '' && form.cost_seed_max !== '';
+    form.price_estimate !== '';
 
   const S = {
     row:   { display:'flex', gap:12, marginBottom:14 },
@@ -134,14 +133,9 @@ function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Lab
       </div>
       <div style={S.row}>
         <div style={{ flex:1 }}>
-          <label style={S.label}>Cost Min (₹)</label>
-          <input style={S.input} type="number" value={form.cost_seed_min}
-            onChange={e => set('cost_seed_min', e.target.value)} placeholder="e.g. 120000" />
-        </div>
-        <div style={{ flex:1 }}>
-          <label style={S.label}>Cost Max (₹)</label>
-          <input style={S.input} type="number" value={form.cost_seed_max}
-            onChange={e => set('cost_seed_max', e.target.value)} placeholder="e.g. 250000" />
+          <label style={S.label}>Price Estimate (₹)</label>
+          <input style={S.input} type="number" value={form.price_estimate}
+            onChange={e => set('price_estimate', e.target.value)} placeholder="e.g. 75000" />
         </div>
       </div>
       <div style={{ marginBottom:14 }}>
@@ -275,7 +269,14 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
           {/* Manual tab */}
           {tab === 'manual' && (
             <LabelForm
-              initial={image.image_labels?.[0] ?? {}}
+              initial={{
+                ...(image.image_labels?.[0] ?? {}),
+                price_estimate:
+                  image.price_inr ??
+                  (image.image_labels?.[0]?.cost_seed_min && image.image_labels?.[0]?.cost_seed_max
+                    ? Math.round((Number(image.image_labels[0].cost_seed_min) + Number(image.image_labels[0].cost_seed_max)) / 2)
+                    : ''),
+              }}
               onSubmit={handleManualLabel}
               submitting={submitting}
             />
@@ -342,9 +343,9 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                   ))}
                 </div>
                 <div>
-                  <div style={{ fontSize:10, color:'#999', marginBottom:3 }}>Cost Range</div>
+                  <div style={{ fontSize:10, color:'#999', marginBottom:3 }}>Price Estimate</div>
                   <div style={{ fontSize:14, fontWeight:700, color:'#1a0a0a' }}>
-                    {formatINR(suggestion.suggested_cost_min)} – {formatINR(suggestion.suggested_cost_max)}
+                    {formatINR(suggestion.suggested_price_estimate)}
                   </div>
                 </div>
                 {suggestion.reasoning && (
@@ -382,8 +383,7 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                     function_type: suggestion.suggested_function,
                     style:         suggestion.suggested_style,
                     complexity:    suggestion.suggested_complexity,
-                    cost_seed_min: suggestion.suggested_cost_min,
-                    cost_seed_max: suggestion.suggested_cost_max,
+                    price_estimate: suggestion.suggested_price_estimate,
                   }}
                   onSubmit={(form) => handleSuggestion('edit', form)}
                   submitting={submitting}

@@ -21,7 +21,7 @@ async function apiFetch(path, opts = {}) {
   return res.json();
 }
 
-function ImageCard({ item, type }) {
+function ImageCard({ item }) {
   const badgeStyle = {
     display: 'inline-block',
     fontSize: 10,
@@ -29,8 +29,8 @@ function ImageCard({ item, type }) {
     letterSpacing: '0.8px',
     padding: '2px 7px',
     borderRadius: 999,
-    background: type === 'scraped' ? '#e0f2fe' : '#f5f0eb',
-    color: type === 'scraped' ? '#0369a1' : '#7a1c1c',
+    background: '#e0f2fe',
+    color: '#0369a1',
     textTransform: 'uppercase',
   };
 
@@ -51,7 +51,7 @@ function ImageCard({ item, type }) {
       </div>
       <div style={{ padding: 10 }}>
         <div style={{ marginBottom: 6 }}>
-          <span style={badgeStyle}>{type === 'scraped' ? 'Scraped' : 'Seed'}</span>
+          <span style={badgeStyle}>Scraped</span>
         </div>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#1f1f1f', lineHeight: 1.3, minHeight: 31 }}>
           {item.label || 'Decor Item'}
@@ -66,9 +66,8 @@ function ImageCard({ item, type }) {
 
 export default function AdminDecorLibrary() {
   const [loading, setLoading] = useState(true);
-  const [seedDecor, setSeedDecor] = useState([]);
   const [scraped, setScraped] = useState([]);
-  const [tab, setTab] = useState('all');
+  const [query, setQuery] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -76,23 +75,7 @@ export default function AdminDecorLibrary() {
       setLoading(true);
       setError('');
       try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const [seed, scrapedData] = await Promise.all([
-          apiFetch('/api/decor'),
-          apiFetch('/api/scraper/images?limit=200'),
-        ]);
-
-        const mappedSeed = (seed.items ?? []).map((d) => ({
-          id: d.id,
-          label: d.label,
-          function: d.function_type,
-          style: d.style,
-          imageUrl: d.image_url
-            ? (String(d.image_url).startsWith('http')
-              ? d.image_url
-              : (supabaseUrl ? `${supabaseUrl}/storage/v1/object/public/decor-images/${d.image_url}` : null))
-            : null,
-        }));
+        const scrapedData = await apiFetch('/api/scraper/images?limit=400');
 
         const mappedScraped = (scrapedData.images ?? []).map((img) => ({
           id: img.id,
@@ -101,9 +84,10 @@ export default function AdminDecorLibrary() {
           style: img.style,
           imageUrl: img.publicUrl || img.image_url || null,
           status: img.status,
+          priceInr: img.price_inr,
+          priceRangeTag: img.price_range_tag,
         }));
 
-        setSeedDecor(mappedSeed);
         setScraped(mappedScraped);
       } catch (e) {
         setError(e.message || 'Failed to load decor library');
@@ -115,11 +99,16 @@ export default function AdminDecorLibrary() {
     load();
   }, []);
 
-  const visible = useMemo(() => {
-    if (tab === 'seed') return seedDecor;
-    if (tab === 'scraped') return scraped;
-    return [...seedDecor, ...scraped];
-  }, [tab, seedDecor, scraped]);
+  const visible = useMemo(
+    () => scraped.filter((item) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      return [item.label, item.function, item.style, item.status, item.priceRangeTag]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q));
+    }),
+    [scraped, query],
+  );
 
   const S = {
     title: { fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: '#1a0a0a', margin: 0 },
@@ -132,37 +121,28 @@ export default function AdminDecorLibrary() {
         <AdminPlaceholder
           icon={<FiImage />}
           title="Decor Library"
-          description="Manage seed decor items. Scraped images are managed via the Labelling Queue."
+          description="No scraped decor is available yet. Run scraper and label images to populate this library."
         />
       ) : (
         <>
       <h1 style={S.title}>Decor Library</h1>
-      <p style={S.sub}>Unified decor catalog with both seed data and scraped images.</p>
+      <p style={S.sub}>Scraped decor catalog connected directly to database records.</p>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        {[
-          { key: 'all', label: `All (${seedDecor.length + scraped.length})` },
-          { key: 'seed', label: `Seed (${seedDecor.length})` },
-          { key: 'scraped', label: `Scraped (${scraped.length})` },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              border: `1px solid ${tab === t.key ? '#7a1c1c' : '#e0d5c5'}`,
-              background: tab === t.key ? '#7a1c1c' : '#fff',
-              color: tab === t.key ? '#E8C97A' : '#7a1c1c',
-              padding: '7px 12px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: "'Jost',sans-serif",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12, color: '#666' }}>Total: <strong>{scraped.length}</strong></div>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search title / function / style / status"
+          style={{
+            minWidth: 260,
+            padding: '8px 10px',
+            border: '1px solid #e0d5c5',
+            borderRadius: 8,
+            fontSize: 12,
+            fontFamily: "'Jost',sans-serif",
+          }}
+        />
       </div>
 
       {error && <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 10 }}>{error}</div>}
@@ -173,11 +153,7 @@ export default function AdminDecorLibrary() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>
           {visible.map((item) => (
-            <ImageCard
-              key={item.id}
-              item={item}
-              type={scraped.some((x) => x.id === item.id) ? 'scraped' : 'seed'}
-            />
+            <ImageCard key={item.id} item={item} />
           ))}
         </div>
       )}

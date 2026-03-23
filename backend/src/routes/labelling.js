@@ -23,6 +23,38 @@ const router  = express.Router();
 const { requireAdmin, supabaseAdmin } = require('../middleware/authMiddleware');
 const { autoTagImage, batchAutoTag }  = require('../services/openrouterService');
 
+function derivePriceRangeTag(priceInr) {
+  if (!Number.isFinite(Number(priceInr))) return null;
+  const p = Number(priceInr);
+  if (p >= 1000 && p < 15000) return 'Budget';
+  if (p >= 15000 && p < 80000) return 'Mid-Range';
+  if (p >= 80000 && p <= 500000) return 'Premium';
+  return null;
+}
+
+function seedRangeFromPrice(priceInr) {
+  if (!Number.isFinite(Number(priceInr))) return { min: null, max: null };
+  const p = Number(priceInr);
+  return {
+    min: Math.max(1000, Math.round(p * 0.9)),
+    max: Math.round(p * 1.1),
+  };
+}
+
+function deriveAiPriceEstimate(tags = {}) {
+  const direct = Number.parseInt(tags.price_estimate, 10);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+
+  const min = Number.parseInt(tags.cost_seed_min, 10);
+  const max = Number.parseInt(tags.cost_seed_max, 10);
+  if (Number.isFinite(min) && Number.isFinite(max) && max >= min) {
+    return Math.round((min + max) / 2);
+  }
+  if (Number.isFinite(min) && min > 0) return min;
+  if (Number.isFinite(max) && max > 0) return max;
+  return 10000;
+}
+
 // ── GET /api/labelling/queue ───────────────────────────────────────────────
 router.get('/queue', requireAdmin, async (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit)  || 24, 100);
@@ -33,9 +65,9 @@ router.get('/queue', requireAdmin, async (req, res) => {
     .from('scraped_images')
     .select(`
       id, source_url, image_url, storage_path, title, description,
-      scraped_tags, width_px, height_px, status, created_at,
+      scraped_tags, price_text, price_inr, price_range_tag, width_px, height_px, status, created_at,
       scrape_sources ( name ),
-      image_labels ( id, function_type, style, complexity, cost_seed_min, cost_seed_max, label_source, confidence ),
+      image_labels ( id, function_type, style, complexity, label_source, confidence ),
       ai_label_suggestions ( id, status, suggested_function, suggested_style, suggested_complexity, suggested_cost_min, suggested_cost_max, confidence )
     `, { count: 'exact' })
     .eq('status', status)
@@ -78,14 +110,17 @@ router.get('/image/:id', requireAdmin, async (req, res) => {
 
 // ── POST /api/labelling/label ──────────────────────────────────────────────
 router.post('/label', requireAdmin, async (req, res) => {
-  const { imageId, function_type, style, complexity, cost_seed_min, cost_seed_max, notes } = req.body;
+  const { imageId, function_type, style, complexity, price_estimate, notes } = req.body;
 
   if (!imageId || !function_type || !style || !complexity) {
     return res.status(400).json({ error: 'imageId, function_type, style, complexity are required.' });
   }
-  if (cost_seed_min === undefined || cost_seed_max === undefined) {
-    return res.status(400).json({ error: 'cost_seed_min and cost_seed_max are required.' });
+  if (price_estimate === undefined || price_estimate === null || Number.isNaN(Number(price_estimate))) {
+    return res.status(400).json({ error: 'price_estimate is required.' });
   }
+
+  const priceEstimate = Number.parseInt(price_estimate, 10);
+  const range = seedRangeFromPrice(priceEstimate);
 
   const { data: label, error: labelError } = await supabaseAdmin
     .from('image_labels')
@@ -94,8 +129,8 @@ router.post('/label', requireAdmin, async (req, res) => {
       function_type,
       style,
       complexity,
-      cost_seed_min:  parseInt(cost_seed_min),
-      cost_seed_max:  parseInt(cost_seed_max),
+      cost_seed_min:  range.min,
+      cost_seed_max:  range.max,
       label_source:   'manual',
       confidence:     1.0,
       labelled_by:    req.profile.id,
@@ -111,7 +146,11 @@ router.post('/label', requireAdmin, async (req, res) => {
 
   await supabaseAdmin
     .from('scraped_images')
-    .update({ status: 'labelled' })
+    .update({
+      status: 'labelled',
+      price_inr: priceEstimate,
+      price_range_tag: derivePriceRangeTag(priceEstimate),
+    })
     .eq('id', imageId);
 
   res.json({ label, message: 'Image labelled successfully.' });
@@ -164,12 +203,15 @@ router.post('/autotag/:imageId([0-9a-fA-F-]{36})', requireAdmin, async (req, res
         tokens_used: tokensUsed, cost_usd: costUsd,
       }).then(() => {}).catch(() => {});
 
+      const aiPrice = deriveAiPriceEstimate(tags);
+      const aiRange = seedRangeFromPrice(aiPrice);
+
       const { data: label, error: labelError } = await supabaseAdmin
         .from('image_labels')
         .upsert({
           image_id: imageId, function_type: tags.function_type, style: tags.style,
-          complexity: tags.complexity, cost_seed_min: tags.cost_seed_min,
-          cost_seed_max: tags.cost_seed_max, label_source: 'ai_confirmed',
+          complexity: tags.complexity, cost_seed_min: aiRange.min,
+          cost_seed_max: aiRange.max, label_source: 'ai_confirmed',
           confidence: tags.confidence, labelled_by: req.profile.id,
           labelled_at: new Date().toISOString(), is_in_training: true,
           updated_at: new Date().toISOString(),
@@ -178,7 +220,11 @@ router.post('/autotag/:imageId([0-9a-fA-F-]{36})', requireAdmin, async (req, res
 
       if (labelError) return res.status(500).json({ error: labelError.message });
 
-      await supabaseAdmin.from('scraped_images').update({ status: 'labelled' }).eq('id', imageId);
+      await supabaseAdmin.from('scraped_images').update({
+        status: 'labelled',
+        price_inr: aiPrice,
+        price_range_tag: derivePriceRangeTag(aiPrice),
+      }).eq('id', imageId);
 
       return res.json({
         bypassed: true, label, tags, modelUsed, tokensUsed, costUsd,
@@ -189,14 +235,14 @@ router.post('/autotag/:imageId([0-9a-fA-F-]{36})', requireAdmin, async (req, res
       // ── SIGN-OFF MODE: stage as pending suggestion ──────────────────────
       const { data: suggestion, error: sugError } = await supabaseAdmin
         .from('ai_label_suggestions')
-        .insert({
+        .upsert({
           image_id: imageId, model_used: modelUsed, raw_response: rawResponse,
           suggested_function: tags.function_type, suggested_style: tags.style,
           suggested_complexity: tags.complexity, suggested_cost_min: tags.cost_seed_min,
           suggested_cost_max: tags.cost_seed_max, confidence: tags.confidence,
           reasoning: tags.reasoning, status: 'pending',
           tokens_used: tokensUsed, cost_usd: costUsd,
-        })
+        }, { onConflict: 'image_id' })
         .select().single();
 
       if (sugError) return res.status(500).json({ error: sugError.message });
@@ -258,15 +304,22 @@ router.post('/autotag/batch', requireAdmin, async (req, res) => {
         tokens_used: tokensUsed, cost_usd: costUsd,
       }, { onConflict: 'image_id' }).then(() => {}).catch(() => {});
 
+      const aiPrice = deriveAiPriceEstimate(tags);
+      const aiRange = seedRangeFromPrice(aiPrice);
+
       await supabaseAdmin.from('image_labels').upsert({
         image_id: imageId, function_type: tags.function_type, style: tags.style,
-        complexity: tags.complexity, cost_seed_min: tags.cost_seed_min,
-        cost_seed_max: tags.cost_seed_max, label_source: 'ai_confirmed',
+        complexity: tags.complexity, cost_seed_min: aiRange.min,
+        cost_seed_max: aiRange.max, label_source: 'ai_confirmed',
         confidence: tags.confidence, is_in_training: true,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'image_id' });
 
-      await supabaseAdmin.from('scraped_images').update({ status: 'labelled' }).eq('id', imageId);
+      await supabaseAdmin.from('scraped_images').update({
+        status: 'labelled',
+        price_inr: aiPrice,
+        price_range_tag: derivePriceRangeTag(aiPrice),
+      }).eq('id', imageId);
 
     } else {
       // Stage as pending suggestion
@@ -305,6 +358,10 @@ router.get('/suggestions', requireAdmin, async (req, res) => {
 
   const suggestions = (data ?? []).map(s => ({
     ...s,
+    suggested_price_estimate: deriveAiPriceEstimate({
+      cost_seed_min: s.suggested_cost_min,
+      cost_seed_max: s.suggested_cost_max,
+    }),
     publicUrl: s.scraped_images?.storage_path
       ? `${process.env.SUPABASE_URL}/storage/v1/object/public/decor-images/${s.scraped_images.storage_path}`
       : s.scraped_images?.image_url,
@@ -346,15 +403,26 @@ router.put('/suggestions/:id', requireAdmin, async (req, res) => {
     function_type: overrides.function_type ?? suggestion.suggested_function,
     style:         overrides.style         ?? suggestion.suggested_style,
     complexity:    overrides.complexity    ?? suggestion.suggested_complexity,
-    cost_seed_min: overrides.cost_seed_min ?? suggestion.suggested_cost_min,
-    cost_seed_max: overrides.cost_seed_max ?? suggestion.suggested_cost_max,
+    price_estimate: Number.parseInt(
+      overrides.price_estimate ?? deriveAiPriceEstimate({
+      cost_seed_min: suggestion.suggested_cost_min,
+      cost_seed_max: suggestion.suggested_cost_max,
+      }),
+      10,
+    ),
   };
+
+  const finalRange = seedRangeFromPrice(finalTags.price_estimate);
 
   const { data: label, error: labelError } = await supabaseAdmin
     .from('image_labels')
     .upsert({
       image_id:       suggestion.image_id,
-      ...finalTags,
+      function_type:   finalTags.function_type,
+      style:           finalTags.style,
+      complexity:      finalTags.complexity,
+      cost_seed_min:   finalRange.min,
+      cost_seed_max:   finalRange.max,
       label_source:   'ai_confirmed',
       confidence:     suggestion.confidence,
       labelled_by:    req.profile.id,
@@ -366,7 +434,11 @@ router.put('/suggestions/:id', requireAdmin, async (req, res) => {
 
   if (labelError) return res.status(500).json({ error: labelError.message });
 
-  await supabaseAdmin.from('scraped_images').update({ status: 'labelled' }).eq('id', suggestion.image_id);
+  await supabaseAdmin.from('scraped_images').update({
+    status: 'labelled',
+    price_inr: finalTags.price_estimate,
+    price_range_tag: derivePriceRangeTag(finalTags.price_estimate),
+  }).eq('id', suggestion.image_id);
 
   res.json({ label, finalTags, message: `Suggestion ${newStatus}. Image added to dataset.` });
 });

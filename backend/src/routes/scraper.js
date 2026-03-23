@@ -294,7 +294,7 @@ router.get('/images', requireAdmin, async (req, res) => {
     .from('scraped_images')
     .select(`
       id, source_url, image_url, storage_path, title, description,
-      scraped_tags, price_text, price_inr, width_px, height_px, file_size_bytes, status, created_at,
+      scraped_tags, price_text, price_inr, price_range_tag, width_px, height_px, file_size_bytes, status, created_at,
       scrape_sources ( name )
     `)
     .order('created_at', { ascending: false })

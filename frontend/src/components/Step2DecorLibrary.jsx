@@ -139,6 +139,7 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
                 <div style={{ display:'flex', gap:4, marginBottom:6, flexWrap:'wrap' }}>
                   <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, fontWeight:600, background:'#EEE8E0', color:'#5A4035' }}>{d.style}</span>
                   {d.complexity && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, fontWeight:700, background:`${COMPLEXITY_COLOR[d.complexity]}18`, color:COMPLEXITY_COLOR[d.complexity] }}>{d.complexity}</span>}
+                  {d.priceRangeTag && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, fontWeight:700, background:'#fef3c7', color:'#92400e' }}>{d.priceRangeTag}</span>}
                   {d.source === 'scraped' && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, background:'#e0f2fe', color:'#0369a1' }}>AI tagged</span>}
                 </div>
                 <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:13, fontWeight:600, color: on ? 'var(--maroon)' : 'var(--muted)' }}>

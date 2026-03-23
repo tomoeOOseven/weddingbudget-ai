@@ -445,6 +445,7 @@ create table public.scraped_images (
   scraped_tags      jsonb not null default '[]',          -- any tags found on the source site
   price_text        text,                                 -- scraped price string from source page
   price_inr         integer,                              -- parsed integer INR value when available
+  price_range_tag   text,                                 -- derived price bucket: Budget | Mid-Range | Premium
   image_hash        text,                                 -- perceptual hash for dedup
   width_px          integer,
   height_px         integer,
@@ -457,6 +458,8 @@ create unique index idx_scraped_images_hash   on public.scraped_images (image_ha
   where image_hash is not null;
 create index idx_scraped_images_status        on public.scraped_images (status);
 create index idx_scraped_images_source        on public.scraped_images (source_id);
+create index idx_scraped_images_price_inr     on public.scraped_images (price_inr);
+create index idx_scraped_images_price_range_tag on public.scraped_images (price_range_tag);
 
 comment on column public.scraped_images.image_hash is
   'Perceptual hash (pHash) used to deduplicate near-identical images across sources.';
