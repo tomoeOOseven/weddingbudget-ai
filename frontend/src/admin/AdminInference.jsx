@@ -4,6 +4,7 @@ import { fetchFromApi } from '../lib/apiBase.js';
 import { FiCpu, FiImage } from 'react-icons/fi';
 
 const HF_PREDICT_URL = 'https://gamerquant-wedding-decor-price.hf.space/run/predict';
+const HF_SPACE_BASE = 'https://gamerquant-wedding-decor-price.hf.space';
 
 function toDataUrl(blob) {
   return new Promise((resolve, reject) => {
@@ -20,6 +21,72 @@ function domainFromUrl(rawUrl) {
   } catch {
     return '';
   }
+}
+
+function parseSseData(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  let last = null;
+  for (const line of lines) {
+    if (!line.startsWith('data:')) continue;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === '[DONE]') continue;
+    try {
+      last = JSON.parse(payload);
+    } catch {
+      // ignore non-JSON chunks
+    }
+  }
+
+  if (last && Array.isArray(last.data)) return { data: last.data };
+  if (Array.isArray(last)) return { data: last };
+  return null;
+}
+
+async function callPredictApi(payload) {
+  const directCandidates = [
+    HF_PREDICT_URL,
+    `${HF_SPACE_BASE}/gradio_api/run/predict`,
+  ];
+
+  for (const url of directCandidates) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.status === 404) continue;
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body?.error || `Prediction API failed (${response.status})`);
+    }
+    return body;
+  }
+
+  // Gradio call API fallback: POST /call/{api_name} then read event stream.
+  const callStart = await fetch(`${HF_SPACE_BASE}/gradio_api/call/predict`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const callBody = await callStart.json().catch(() => ({}));
+  if (!callStart.ok) {
+    throw new Error(callBody?.error || `Prediction API failed (${callStart.status})`);
+  }
+  if (!callBody?.event_id) {
+    if (Array.isArray(callBody?.data)) return callBody;
+    throw new Error('Prediction API returned no event_id and no data.');
+  }
+
+  const callResult = await fetch(`${HF_SPACE_BASE}/gradio_api/call/predict/${callBody.event_id}`);
+  const callText = await callResult.text();
+  const parsed = parseSseData(callText);
+  if (!parsed) {
+    throw new Error('Prediction API returned an unreadable event stream.');
+  }
+  return parsed;
 }
 
 async function apiFetch(path, opts = {}) {
@@ -116,15 +183,7 @@ export default function AdminInference() {
         ],
       };
 
-      const response = await fetch(HF_PREDICT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body?.error || `Prediction API failed (${response.status})`);
-
+      const body = await callPredictApi(payload);
       setPrediction(body);
     } catch (e) {
       setMessage(`Error: ${e.message}`);
