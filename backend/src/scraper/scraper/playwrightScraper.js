@@ -233,6 +233,7 @@ async function runPlaywrightScraper(config, maxPages, logFn = () => {}) {
   const allImages = [];
   const seenUrls  = new Set();
   const followNextPages = config.followNextPages !== false;
+  const stopOnEmptyPage = config.stopOnEmptyPage === true;
 
   try {
     browser = await chromium.launch({
@@ -294,6 +295,11 @@ async function runPlaywrightScraper(config, maxPages, logFn = () => {}) {
             seenUrls.add(img.imageUrl);
             allImages.push(img);
           }
+        }
+
+        if (stopOnEmptyPage && images.length === 0) {
+          logFn('[playwright] Empty page detected, stopping further pagination for this source.');
+          break;
         }
 
         currentUrl = followNextPages ? await findNextPage(page) : null;

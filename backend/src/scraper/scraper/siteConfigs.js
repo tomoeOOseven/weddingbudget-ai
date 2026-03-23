@@ -49,19 +49,6 @@ const SITE_CONFIGS = {
     minImageW: 220,
   },
 
-  'https://www.wedmegood.com/photos/wedding-decoration-ideas': {
-    scraper: 'playwright',
-    urls: ['https://www.wedmegood.com/photos/wedding-decoration-ideas'],
-    maxPages: 2,
-    imageSelector: 'img',
-    titleSelector: 'h1, h2, h3, [class*="title"], [class*="name"]',
-    descSelector: 'p, [class*="desc"], [class*="caption"]',
-    priceSelector: '[class*="price"], [class*="starting"]',
-    waitFor: 'img',
-    scrollToLoad: true,
-    minImageW: 240,
-  },
-
   'https://unsplash.com/s/photos/indian-wedding-decor': {
     scraper: 'playwright',
     urls: ['https://unsplash.com/s/photos/indian-wedding-decor'],

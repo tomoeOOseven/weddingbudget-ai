@@ -10,6 +10,7 @@ import Step4FB            from './components/Step4FB.jsx';
 import Step5Logistics     from './components/Step5Logistics.jsx';
 import Step6Sundries      from './components/Step6Sundries.jsx';
 import Step7Report        from './components/Step7Report.jsx';
+import { fmt }            from './components/ui.jsx';
 import { useAuth }        from './context/AuthContext.jsx';
 import WeddingDashboard   from './pages/WeddingDashboard.jsx';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -282,7 +283,7 @@ export default function App() {
           <div style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(232,201,122,0.3)', borderRadius:8, padding:'10px 16px' }}>
             <div style={{ fontSize:10, fontWeight:600, letterSpacing:'1px', textTransform:'uppercase', color:'rgba(232,201,122,0.65)' }}>Live Estimate</div>
             <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, fontWeight:700, color:'#E8C97A' }}>
-              {budget.tMin >= 100000 ? `₹${(budget.tMin/100000).toFixed(1)}L` : '—'} — {budget.tMax >= 100000 ? `₹${(budget.tMax/100000).toFixed(1)}L` : '—'}
+              {budget.tMin > 0 ? fmt(budget.tMin) : '—'} — {budget.tMax > 0 ? fmt(budget.tMax) : '—'}
             </div>
           </div>
         </div>

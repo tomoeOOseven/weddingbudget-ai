@@ -228,6 +228,7 @@ async function runCheerioScraper(config, maxPages, logFn = () => {}) {
   const allImages = [];
   const seenUrls  = new Set();
   const followNextPages = config.followNextPages !== false;
+  const stopOnEmptyPage = config.stopOnEmptyPage === true;
 
   for (const seedUrl of config.urls) {
     let currentUrl = seedUrl;
@@ -247,6 +248,10 @@ async function runCheerioScraper(config, maxPages, logFn = () => {}) {
       }
 
       logFn(`[cheerio]   → found ${images.length} images (total: ${allImages.length})`);
+      if (stopOnEmptyPage && images.length === 0) {
+        logFn('[cheerio] Empty page detected, stopping further pagination for this source.');
+        break;
+      }
       currentUrl = followNextPages ? nextUrl : null;
     }
   }

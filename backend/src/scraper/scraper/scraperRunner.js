@@ -16,6 +16,8 @@ const { runPlaywrightScraper }  = require('./playwrightScraper');
 const { batchDownloadAndStore } = require('./imageDownloader');
 
 const MAX_PAGE_RANGE = 50;
+const WMG_MAX_PAGE_PROBE = 350;
+const WMG_CANONICAL_URL = 'https://www.wedmegood.com/vendors/all/wedding-decorators/';
 
 function toIntOrNull(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -24,19 +26,24 @@ function toIntOrNull(value) {
 }
 
 function normalizeRange(min, max, fallbackPages = 1) {
+  return normalizeRangeWithCap(min, max, fallbackPages, MAX_PAGE_RANGE);
+}
+
+function normalizeRangeWithCap(min, max, fallbackPages = 1, maxCap = MAX_PAGE_RANGE) {
   const minVal = toIntOrNull(min);
   const maxVal = toIntOrNull(max);
 
   if (minVal !== null && maxVal !== null && minVal >= 1 && maxVal >= minVal) {
-    return { min: minVal, max: Math.min(maxVal, minVal + MAX_PAGE_RANGE - 1), explicit: true };
+    return { min: minVal, max: Math.min(maxVal, minVal + maxCap - 1), explicit: true };
   }
 
-  const pages = Math.min(Math.max(toIntOrNull(fallbackPages) || 1, 1), MAX_PAGE_RANGE);
+  const pages = Math.min(Math.max(toIntOrNull(fallbackPages) || 1, 1), maxCap);
   return { min: 1, max: pages, explicit: false };
 }
 
-function expandUrlByPage(url, pageParam, range) {
+function expandUrlByPage(url, pageParam, range, options = {}) {
   if (!url || typeof url !== 'string') return [url];
+  const { forcePageParam = false } = options;
 
   // Explicit template support: ...?page={page} or /p/{page}
   if (url.includes('{page}')) {
@@ -54,7 +61,7 @@ function expandUrlByPage(url, pageParam, range) {
     return [url];
   }
 
-  if (!parsed.searchParams.has(pageParam)) {
+  if (!parsed.searchParams.has(pageParam) && !forcePageParam) {
     return [url];
   }
 
@@ -65,17 +72,21 @@ function expandUrlByPage(url, pageParam, range) {
   const list = [];
   for (let p = baseMin; p <= baseMax; p++) {
     const u = new URL(parsed.href);
-    u.searchParams.set(pageParam, String(p));
+    if (forcePageParam && p === 1) {
+      u.searchParams.delete(pageParam);
+    } else {
+      u.searchParams.set(pageParam, String(p));
+    }
     list.push(u.toString());
   }
   return list;
 }
 
-function buildSeedUrls(rawUrls, pageParam, pageMin, pageMax, maxPages) {
+function buildSeedUrls(rawUrls, pageParam, pageMin, pageMax, maxPages, options = {}) {
   const normalized = Array.isArray(rawUrls) ? rawUrls.filter(Boolean) : [];
-  const range = normalizeRange(pageMin, pageMax, maxPages);
+  const range = normalizeRangeWithCap(pageMin, pageMax, maxPages, options.maxRangeCap ?? MAX_PAGE_RANGE);
 
-  const expanded = normalized.flatMap((u) => expandUrlByPage(u, pageParam, range));
+  const expanded = normalized.flatMap((u) => expandUrlByPage(u, pageParam, range, options));
   const deduped = [...new Set(expanded)];
 
   const didExpand = deduped.length > normalized.length;
@@ -84,6 +95,15 @@ function buildSeedUrls(rawUrls, pageParam, pageMin, pageMax, maxPages) {
     didExpand,
     range,
   };
+}
+
+function isWedMeGoodUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    return new URL(url).hostname.toLowerCase().includes('wedmegood.com');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -171,22 +191,28 @@ async function runScrapeJob(source, triggeredBy = null, runOptions = {}) {
     Object.entries(SITE_CONFIGS).find(([k]) => source.base_url.startsWith(k))?.[1] ??
     {};
 
-  const effectiveScraperType =
-    source.scraper_type ?? codeConfig.scraper_type ?? codeConfig.scraper ?? 'cheerio';
+  const effectiveScraperType = source.scraper_type ?? codeConfig.scraper_type ?? codeConfig.scraper ?? 'cheerio';
 
   // DB selectors JSONB takes priority if admin has overridden them
   const dbSelectors = source.selectors ?? {};
-  const defaultMaxPages = toIntOrNull(dbSelectors.maxPages) ?? codeConfig.maxPages ?? 2;
-  const rawUrls = (source.url_patterns?.length > 0 ? source.url_patterns : null) ?? codeConfig.urls ?? [source.base_url];
+  const isWedMeGood = isWedMeGoodUrl(source.base_url);
+  const defaultMaxPages = toIntOrNull(dbSelectors.maxPages) ?? 2;
+  const rawUrls = source.url_patterns?.length > 0 ? source.url_patterns : [source.base_url];
   const pageParam = String(dbSelectors.pageParam || codeConfig.pageParam || 'page').trim() || 'page';
-  const effectivePageMin = toIntOrNull(runOptions.pageMin) ?? dbSelectors.pageMin;
-  const effectivePageMax = toIntOrNull(runOptions.pageMax) ?? dbSelectors.pageMax;
+  const inputPageMin = toIntOrNull(runOptions.pageMin) ?? toIntOrNull(dbSelectors.pageMin);
+  const inputPageMax = toIntOrNull(runOptions.pageMax) ?? toIntOrNull(dbSelectors.pageMax);
+  const effectivePageMin = isWedMeGood ? (inputPageMin ?? 1) : inputPageMin;
+  const effectivePageMax = isWedMeGood ? (inputPageMax ?? WMG_MAX_PAGE_PROBE) : inputPageMax;
   const { urls: resolvedUrls, didExpand, range } = buildSeedUrls(
-    rawUrls,
+    isWedMeGood ? [WMG_CANONICAL_URL] : rawUrls,
     pageParam,
     effectivePageMin,
     effectivePageMax,
-    defaultMaxPages
+    defaultMaxPages,
+    {
+      forcePageParam: isWedMeGood,
+      maxRangeCap: isWedMeGood ? WMG_MAX_PAGE_PROBE : MAX_PAGE_RANGE,
+    }
   );
 
   const config = {
@@ -196,6 +222,7 @@ async function runScrapeJob(source, triggeredBy = null, runOptions = {}) {
     urls:          resolvedUrls,
     maxPages:      didExpand ? 1 : defaultMaxPages,
     followNextPages: didExpand ? false : (dbSelectors.followNextPages ?? codeConfig.followNextPages ?? true),
+    stopOnEmptyPage: isWedMeGood,
     // DB-stored selectors override code selectors
     imageSelector: dbSelectors.imageSelector ?? codeConfig.imageSelector ?? 'img',
     titleSelector: dbSelectors.titleSelector ?? codeConfig.titleSelector ?? 'h2, h3',
@@ -211,6 +238,10 @@ async function runScrapeJob(source, triggeredBy = null, runOptions = {}) {
 
   if (didExpand) {
     logger.log(`Expanded page-query URLs using "${pageParam}" from ${range.min} to ${range.max}. Total seed URLs: ${config.urls.length}`);
+  }
+
+  if (isWedMeGood) {
+    logger.log(`WedMeGood mode enabled. Using canonical URL and stopping at first empty page.`);
   }
 
   try {

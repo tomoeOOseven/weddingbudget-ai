@@ -20,6 +20,31 @@ const { runScrapeJob, runAllSources } = require('../scraper/scraper/scraperRunne
 
 // Track in-progress jobs to prevent duplicate runs (simple in-process lock)
 const runningJobs = new Set(); // sourceId values currently being scraped
+const WMG_CANONICAL_URL = 'https://www.wedmegood.com/vendors/all/wedding-decorators/';
+
+function isWedMeGoodUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    return new URL(url).hostname.toLowerCase().includes('wedmegood.com');
+  } catch {
+    return false;
+  }
+}
+
+function normalizeUrlList(list = []) {
+  if (!Array.isArray(list)) return [];
+  return [...new Set(list.filter((u) => typeof u === 'string' && u.trim()).map((u) => u.trim()))];
+}
+
+function canonicalizeWedMeGoodSourceFields({ baseUrl, urlPatterns }) {
+  if (!isWedMeGoodUrl(baseUrl)) {
+    return { baseUrl, urlPatterns: normalizeUrlList(urlPatterns) };
+  }
+  return {
+    baseUrl: WMG_CANONICAL_URL,
+    urlPatterns: [WMG_CANONICAL_URL],
+  };
+}
 
 // ── POST /api/scraper/run ──────────────────────────────────────────────────
 // Body: { sourceId?: string, all?: boolean, pageMin?: number, pageMax?: number }
@@ -154,7 +179,12 @@ router.post('/sources', requireAdmin, async (req, res) => {
     rate_limit_ms = 2000, scrape_interval = '7 days', notes,
   } = req.body;
 
-  if (!name || !base_url) {
+  const normalizedSource = canonicalizeWedMeGoodSourceFields({
+    baseUrl: base_url,
+    urlPatterns: url_patterns,
+  });
+
+  if (!name || !normalizedSource.baseUrl) {
     return res.status(400).json({ error: 'name and base_url are required.' });
   }
 
@@ -166,8 +196,12 @@ router.post('/sources', requireAdmin, async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('scrape_sources')
     .insert({
-      name, base_url, scraper_type,
-      url_patterns, selectors, rate_limit_ms,
+      name,
+      base_url: normalizedSource.baseUrl,
+      scraper_type,
+      url_patterns: normalizedSource.urlPatterns,
+      selectors,
+      rate_limit_ms,
       scrape_interval, notes,
       added_by: req.profile.id,
     })
@@ -194,6 +228,24 @@ router.put('/sources/:id', requireAdmin, async (req, res) => {
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No updatable fields provided.' });
+  }
+
+  const { data: current, error: currentError } = await supabaseAdmin
+    .from('scrape_sources')
+    .select('id, base_url')
+    .eq('id', req.params.id)
+    .single();
+
+  if (currentError || !current) {
+    return res.status(404).json({ error: 'Source not found.' });
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'url_patterns')) {
+    const normalized = canonicalizeWedMeGoodSourceFields({
+      baseUrl: current.base_url,
+      urlPatterns: updates.url_patterns,
+    });
+    updates.url_patterns = normalized.urlPatterns;
   }
 
   updates.updated_at = new Date().toISOString();
