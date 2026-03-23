@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { FiActivity, FiBarChart2, FiBookOpen, FiClipboard, FiGrid, FiImage, FiMic, FiShield, FiTag, FiTool, FiTruck } from 'react-icons/fi';
+import { FiActivity, FiBarChart2, FiBookOpen, FiClipboard, FiCpu, FiGrid, FiImage, FiMic, FiShield, FiTag, FiTool, FiTruck } from 'react-icons/fi';
 
 // ── Nav items ──────────────────────────────────────────────────────────────
 
@@ -17,8 +17,8 @@ const NAV = [
     items: [
       { path: '/admin/scraper',  label: 'Scraper Control', icon: <FiTool /> },
       { path: '/admin/labelling',label: 'Labelling Queue', icon: <FiTag /> },
-      { path: '/admin/model',    label: '🧠 Model Training',  icon: <FiActivity /> },
-      { path: '/admin/inference',label: '🔮 Model Inference', icon: <FiActivity /> },
+      { path: '/admin/model',    label: 'Model Training',  icon: <FiActivity /> },
+      { path: '/admin/inference',label: 'Model Inference', icon: <FiCpu /> },
     ],
   },
   {

@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: backend
     plan: starter
-    buildCommand: npm ci && pip install -r ../ml_service/requirements.txt && pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && pip install git+https://github.com/openai/CLIP.git && npx playwright install chromium
+    buildCommand: npm ci && npx playwright install chromium
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -35,7 +35,7 @@ services:
       - key: API_SECRET_KEY
         sync: false
       - key: EMBEDDED_ML_SERVICE
-        value: "1"
+        value: "0"
       - key: ML_SERVICE_PORT
         value: "8000"
       - key: ML_SERVICE_URL

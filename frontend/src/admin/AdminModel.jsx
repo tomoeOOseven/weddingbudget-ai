@@ -159,7 +159,7 @@ export default function AdminModel() {
 
   return (
     <div style={{ fontFamily:"'Jost',sans-serif" }}>
-      <h1 style={S.title}>🧠 Model Training</h1>
+      <h1 style={S.title}><FiActivity style={{ verticalAlign: 'middle', marginRight: 8 }} />Model Training</h1>
       <p style={S.sub}>Train, evaluate, and promote cost prediction models.</p>
 
       {/* ML Service health */}
