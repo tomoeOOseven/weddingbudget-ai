@@ -20,6 +20,26 @@ const BROWSER_ARGS = [
 // Realistic browser fingerprint
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
+const PRICE_PATTERNS = [
+  /(?:₹|Rs\.?|INR)\s*([\d,]+)\s*(?:onwards|onward|starting|start|per\s*event|\/day|\/event)?/i,
+  /(?:starting\s*(?:at|from)|price\s*from|from)\s*(?:₹|Rs\.?|INR)?\s*([\d,]+)/i,
+  /([\d,]{4,})\s*(?:onwards|onward)/i,
+];
+
+function extractSeedPrice(text = '') {
+  if (!text) return null;
+  if (/price\s*on\s*request/i.test(text)) return 'Price on Request';
+
+  for (const pat of PRICE_PATTERNS) {
+    const m = text.match(pat);
+    if (m?.[1]) {
+      const digits = String(m[1]).replace(/[^\d]/g, '');
+      if (digits) return `Rs ${Number(digits)}`;
+    }
+  }
+  return null;
+}
+
 /**
  * Dismiss common cookie/GDPR banners.
  */
@@ -70,6 +90,8 @@ async function extractImages(page, config, pageUrl) {
     const results = [];
     const seen    = new Set();
 
+    const normalizeSpace = (txt = '') => String(txt).replace(/\s+/g, ' ').trim();
+
     const imgEls = document.querySelectorAll(imageSelector);
 
     imgEls.forEach(el => {
@@ -100,14 +122,18 @@ async function extractImages(page, config, pageUrl) {
       const getText = (sel) => {
         if (!sel) return '';
         const el = container.querySelector(sel);
-        return el ? el.textContent?.trim().slice(0, 255) : '';
+        return el ? normalizeSpace(el.textContent || '').slice(0, 255) : '';
       };
+
+      const fallbackName = normalizeSpace(el.getAttribute('alt') || el.getAttribute('title') || '');
+      const containerText = normalizeSpace(container.textContent || '');
+      const pickedTitle = getText(titleSelector) || getText('[itemprop="name"]') || getText('h1, h2, h3, h4') || fallbackName;
 
       results.push({
         imageUrl:    src,
-        title:       getText(titleSelector) || el.alt || el.title || null,
+        title:       pickedTitle || null,
         description: getText(descSelector) || null,
-        priceText:   priceSelector ? getText(priceSelector) : null,
+        priceText:   [priceSelector ? getText(priceSelector) : '', containerText].filter(Boolean).join(' '),
         scrapedTags: [],
       });
     });
@@ -118,7 +144,11 @@ async function extractImages(page, config, pageUrl) {
     titleSelector: config.titleSelector,
     descSelector:  config.descSelector,
     priceSelector: config.priceSelector,
-  }).then(imgs => imgs.map(img => ({ ...img, sourceUrl: pageUrl })));
+  }).then(imgs => imgs.map(img => ({
+    ...img,
+    sourceUrl: pageUrl,
+    priceText: extractSeedPrice(img.priceText || '') || img.priceText || null,
+  })));
 }
 
 /**
@@ -176,6 +206,16 @@ async function findNextPage(page) {
       const el = document.querySelector(sel);
       if (el?.href && el.href !== window.location.href) return el.href;
     }
+
+    // Text-based fallback.
+    const links = Array.from(document.querySelectorAll('a[href]'));
+    for (const l of links) {
+      const txt = (l.textContent || '').trim().toLowerCase();
+      if (['next', 'next page', '>', '>>'].includes(txt) && l.href !== window.location.href) {
+        return l.href;
+      }
+    }
+
     return null;
   });
 }
