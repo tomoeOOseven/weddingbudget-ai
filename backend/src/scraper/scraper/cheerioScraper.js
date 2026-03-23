@@ -227,6 +227,7 @@ async function scrapePage(url, config, rateLimitMs = 1500) {
 async function runCheerioScraper(config, maxPages, logFn = () => {}) {
   const allImages = [];
   const seenUrls  = new Set();
+  const followNextPages = config.followNextPages !== false;
 
   for (const seedUrl of config.urls) {
     let currentUrl = seedUrl;
@@ -246,7 +247,7 @@ async function runCheerioScraper(config, maxPages, logFn = () => {}) {
       }
 
       logFn(`[cheerio]   → found ${images.length} images (total: ${allImages.length})`);
-      currentUrl = nextUrl;
+      currentUrl = followNextPages ? nextUrl : null;
     }
   }
 

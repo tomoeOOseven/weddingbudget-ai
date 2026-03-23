@@ -232,6 +232,7 @@ async function runPlaywrightScraper(config, maxPages, logFn = () => {}) {
   let browser;
   const allImages = [];
   const seenUrls  = new Set();
+  const followNextPages = config.followNextPages !== false;
 
   try {
     browser = await chromium.launch({
@@ -295,7 +296,7 @@ async function runPlaywrightScraper(config, maxPages, logFn = () => {}) {
           }
         }
 
-        currentUrl = await findNextPage(page);
+        currentUrl = followNextPages ? await findNextPage(page) : null;
       }
     }
 

@@ -16,7 +16,7 @@
 const express = require('express');
 const router  = express.Router();
 const { requireAdmin, supabaseAdmin } = require('../middleware/authMiddleware');
-const { runScrapeJob, runAllSources } = require('../scraper/scraperRunner');
+const { runScrapeJob, runAllSources } = require('../scraper/scraper/scraperRunner');
 
 // Track in-progress jobs to prevent duplicate runs (simple in-process lock)
 const runningJobs = new Set(); // sourceId values currently being scraped

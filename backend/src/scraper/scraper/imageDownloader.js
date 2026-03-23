@@ -11,7 +11,7 @@ const axios  = require('axios');
 const sharp  = require('sharp');
 const path   = require('path');
 const crypto = require('crypto');
-const { supabaseAdmin } = require('../middleware/authMiddleware');
+const { supabaseAdmin } = require('../../middleware/authMiddleware');
 
 const STORAGE_BUCKET = 'decor-images';
 const DOWNLOAD_TIMEOUT_MS = 15000;

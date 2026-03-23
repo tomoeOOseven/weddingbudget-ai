@@ -9,11 +9,82 @@
 //   6. Updates scrape_sources.last_scraped_at on completion
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { supabaseAdmin }         = require('../middleware/authMiddleware');
+const { supabaseAdmin }         = require('../../middleware/authMiddleware');
 const { SITE_CONFIGS }          = require('./siteConfigs');
 const { runCheerioScraper }     = require('./cheerioScraper');
 const { runPlaywrightScraper }  = require('./playwrightScraper');
 const { batchDownloadAndStore } = require('./imageDownloader');
+
+const MAX_PAGE_RANGE = 50;
+
+function toIntOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number.parseInt(value, 10);
+  return Number.isInteger(n) ? n : null;
+}
+
+function normalizeRange(min, max, fallbackPages = 1) {
+  const minVal = toIntOrNull(min);
+  const maxVal = toIntOrNull(max);
+
+  if (minVal !== null && maxVal !== null && minVal >= 1 && maxVal >= minVal) {
+    return { min: minVal, max: Math.min(maxVal, minVal + MAX_PAGE_RANGE - 1), explicit: true };
+  }
+
+  const pages = Math.min(Math.max(toIntOrNull(fallbackPages) || 1, 1), MAX_PAGE_RANGE);
+  return { min: 1, max: pages, explicit: false };
+}
+
+function expandUrlByPage(url, pageParam, range) {
+  if (!url || typeof url !== 'string') return [url];
+
+  // Explicit template support: ...?page={page} or /p/{page}
+  if (url.includes('{page}')) {
+    const list = [];
+    for (let p = range.min; p <= range.max; p++) {
+      list.push(url.replaceAll('{page}', String(p)));
+    }
+    return list;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return [url];
+  }
+
+  if (!parsed.searchParams.has(pageParam)) {
+    return [url];
+  }
+
+  const currentPage = toIntOrNull(parsed.searchParams.get(pageParam));
+  const baseMin = range.explicit ? range.min : (currentPage && currentPage > 0 ? currentPage : 1);
+  const baseMax = range.explicit ? range.max : Math.min(baseMin + (range.max - range.min), baseMin + MAX_PAGE_RANGE - 1);
+
+  const list = [];
+  for (let p = baseMin; p <= baseMax; p++) {
+    const u = new URL(parsed.href);
+    u.searchParams.set(pageParam, String(p));
+    list.push(u.toString());
+  }
+  return list;
+}
+
+function buildSeedUrls(rawUrls, pageParam, pageMin, pageMax, maxPages) {
+  const normalized = Array.isArray(rawUrls) ? rawUrls.filter(Boolean) : [];
+  const range = normalizeRange(pageMin, pageMax, maxPages);
+
+  const expanded = normalized.flatMap((u) => expandUrlByPage(u, pageParam, range));
+  const deduped = [...new Set(expanded)];
+
+  const didExpand = deduped.length > normalized.length;
+  return {
+    urls: deduped.length ? deduped : normalized,
+    didExpand,
+    range,
+  };
+}
 
 /**
  * slugify a site name for use in storage paths.
@@ -105,12 +176,24 @@ async function runScrapeJob(source, triggeredBy = null) {
 
   // DB selectors JSONB takes priority if admin has overridden them
   const dbSelectors = source.selectors ?? {};
+  const defaultMaxPages = toIntOrNull(dbSelectors.maxPages) ?? codeConfig.maxPages ?? 2;
+  const rawUrls = (source.url_patterns?.length > 0 ? source.url_patterns : null) ?? codeConfig.urls ?? [source.base_url];
+  const pageParam = String(dbSelectors.pageParam || codeConfig.pageParam || 'page').trim() || 'page';
+  const { urls: resolvedUrls, didExpand, range } = buildSeedUrls(
+    rawUrls,
+    pageParam,
+    dbSelectors.pageMin,
+    dbSelectors.pageMax,
+    defaultMaxPages
+  );
+
   const config = {
     ...codeConfig,
     scraper_type:  effectiveScraperType,
     rateLimitMs:   source.rate_limit_ms ?? codeConfig.rateLimitMs ?? 2000,
-    urls:          (source.url_patterns?.length > 0 ? source.url_patterns : null) ?? codeConfig.urls ?? [source.base_url],
-    maxPages:      codeConfig.maxPages ?? 2,
+    urls:          resolvedUrls,
+    maxPages:      didExpand ? 1 : defaultMaxPages,
+    followNextPages: didExpand ? false : (dbSelectors.followNextPages ?? codeConfig.followNextPages ?? true),
     // DB-stored selectors override code selectors
     imageSelector: dbSelectors.imageSelector ?? codeConfig.imageSelector ?? 'img',
     titleSelector: dbSelectors.titleSelector ?? codeConfig.titleSelector ?? 'h2, h3',
@@ -123,6 +206,10 @@ async function runScrapeJob(source, triggeredBy = null) {
 
   const sourceSlug = toSlug(source.name);
   let imagesFound = 0, saved = 0, duped = 0, failed = 0;
+
+  if (didExpand) {
+    logger.log(`Expanded page-query URLs using "${pageParam}" from ${range.min} to ${range.max}. Total seed URLs: ${config.urls.length}`);
+  }
 
   try {
     // ── 3. Run the right scraper ────────────────────────────────────────
