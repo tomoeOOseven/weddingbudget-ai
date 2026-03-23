@@ -20,7 +20,7 @@ const S = {
 };
 
 export default function ClientLogin() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const [mode, setMode]       = useState('login'); // 'login' | 'signup'
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
@@ -32,17 +32,32 @@ export default function ClientLogin() {
 
   // Redirect if already logged in — uses AuthContext, no extra getSession() call
   useEffect(() => {
-    if (!authLoading && user) navigate('/app', { replace: true });
-  }, [authLoading, user]);
+    if (!authLoading && user) {
+      navigate(isAdmin ? '/admin' : '/app', { replace: true });
+    }
+  }, [authLoading, user, isAdmin, navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(''); setOk(''); setLoading(true);
     try {
       if (mode === 'login') {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
-        navigate('/app', { replace: true });
+
+        const userId = data?.user?.id;
+        if (userId) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', userId)
+            .single();
+
+          const adminRole = profile?.role === 'admin' || profile?.role === 'super_admin';
+          navigate(adminRole ? '/admin' : '/app', { replace: true });
+        } else {
+          navigate('/app', { replace: true });
+        }
       } else {
         const { error: err } = await supabase.auth.signUp({
           email, password,

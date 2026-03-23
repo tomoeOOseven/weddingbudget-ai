@@ -94,6 +94,12 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!loading && user && isAdmin) {
+      navigate('/admin', { replace: true });
+    }
+  }, [loading, user, isAdmin, navigate]);
+
   function nextCard() {
     setCardIndex((i) => (i + 1) % cardDesigns.length);
   }
@@ -148,14 +154,20 @@ export default function HomePage() {
           {loading ? (
             <span style={{ color: '#7A5563', fontSize: 12 }}>Checking session...</span>
           ) : user ? (
-            <>
-              <button onClick={() => navigate('/app')} style={{ border: 'none', background: '#6B1E3A', color: '#E8C97A', borderRadius: 999, padding: '9px 16px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <FiUsers /> My Weddings
-              </button>
+            isAdmin ? (
               <button onClick={signOut} style={{ border: '1px solid #d6c4aa', background: '#fff', color: '#6B1E3A', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
                 Sign out
               </button>
-            </>
+            ) : (
+              <>
+                <button onClick={() => navigate('/app')} style={{ border: 'none', background: '#6B1E3A', color: '#E8C97A', borderRadius: 999, padding: '9px 16px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <FiUsers /> My Weddings
+                </button>
+                <button onClick={signOut} style={{ border: '1px solid #d6c4aa', background: '#fff', color: '#6B1E3A', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                  Sign out
+                </button>
+              </>
+            )
           ) : (
             <button onClick={() => navigate('/login')} style={{ border: 'none', background: '#6B1E3A', color: '#E8C97A', borderRadius: 999, padding: '9px 16px', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <FiLogIn /> Sign In
