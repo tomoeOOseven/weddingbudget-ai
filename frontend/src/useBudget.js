@@ -32,47 +32,6 @@ function ensureSet(value, fallbackSet) {
   return new Set(fallbackSet);
 }
 
-function buildArtistPriceRanges(artists) {
-  const values = (artists ?? [])
-    .map((a) => Number(a.costMin ?? a.costMax))
-    .filter((v) => Number.isFinite(v));
-  if (!values.length) {
-    return {
-      Budget: { min: 10000, max: 30000 },
-      'Mid-Range': { min: 30001, max: 70000 },
-      Premium: { min: 70001, max: 150000 },
-    };
-  }
-
-  const min = Math.round(Math.min(...values));
-  const max = Math.round(Math.max(...values));
-  if (min === max) {
-    const spread = Math.max(3000, Math.round(min * 0.15));
-    return {
-      Budget: { min: Math.max(1000, min - spread), max: min },
-      'Mid-Range': { min: min + 1, max: min + spread },
-      Premium: { min: min + spread + 1, max: min + spread * 2 },
-    };
-  }
-
-  const step = (max - min) / 3;
-  const budgetMax = Math.round(min + step);
-  const midMax = Math.round(min + step * 2);
-  return {
-    Budget: { min, max: budgetMax },
-    'Mid-Range': { min: budgetMax + 1, max: midMax },
-    Premium: { min: midMax + 1, max },
-  };
-}
-
-function artistTagFromValue(value, ranges) {
-  const v = Number(value);
-  if (!Number.isFinite(v)) return null;
-  if (v <= ranges.Budget.max) return 'Budget';
-  if (v <= ranges['Mid-Range'].max) return 'Mid-Range';
-  return 'Premium';
-}
-
 function decorBoundsFromTag(tag) {
   if (tag === 'Budget') return { min: 1000, max: 15000 };
   if (tag === 'Mid-Range') return { min: 15001, max: 80000 };
@@ -150,7 +109,6 @@ export function useBudget(refData) {
     const BARS    = refData?.barTiers          ?? [];
     const CTRS    = refData?.specialtyCounters ?? [];
     const ARTISTS = refData?.artists           ?? [];
-    const ARTIST_RANGES = refData?.artistRanges ?? buildArtistPriceRanges(ARTISTS);
     const DECORS  = refData?.decor             ?? [];
     // ── fixed field names: logistics (not logisticsRates), sfxItems (not sfx) ─
     const LR      = refData?.logistics         ?? {};
@@ -219,20 +177,9 @@ export function useBudget(refData) {
       let aMin = 0, aMax = 0;
       [...inputs.selectedArtists].forEach(aId => {
         const a = ARTISTS.find(x => x.id === aId || x.slug === aId);
-        if (a) {
-          const baseValue = Number(a.costMin ?? a.costMax);
-          const tag = a.priceRangeTag || artistTagFromValue(baseValue, ARTIST_RANGES);
-          const bucket = tag ? ARTIST_RANGES[tag] : null;
-          if (bucket) {
-            aMin += bucket.min;
-            aMax += bucket.max;
-          } else {
-            aMin += Number(a.costMin) || 0;
-            aMax += Number(a.costMax) || Number(a.costMin) || 0;
-          }
-        }
+        if (a) { aMin += a.costMin; aMax += a.costMax; }
       });
-      items.push({ cat:'Artists & Entertainment', sub:`${inputs.selectedArtists.size} acts`, min:aMin, max:aMax });
+      items.push({ cat:'Artists & Entertainment', sub:`${inputs.selectedArtists.size} acts`, min:aMin * 0.95, max:aMax * 1.05 });
     }
 
     // 5. Logistics  ← fixed: uses LR.ghodiMin/ghodiMax/dholiUnitMin/dholiUnitMax

@@ -23,47 +23,6 @@ function rangeBounds(tag, fallbackPrice) {
   return null;
 }
 
-function buildArtistPriceRanges(artists) {
-  const values = (artists ?? [])
-    .map((a) => Number(a.cost_min ?? a.cost_max))
-    .filter((v) => Number.isFinite(v));
-  if (!values.length) {
-    return {
-      Budget: { min: 10000, max: 30000 },
-      'Mid-Range': { min: 30001, max: 70000 },
-      Premium: { min: 70001, max: 150000 },
-    };
-  }
-
-  const min = Math.round(Math.min(...values));
-  const max = Math.round(Math.max(...values));
-  if (min === max) {
-    const spread = Math.max(3000, Math.round(min * 0.15));
-    return {
-      Budget: { min: Math.max(1000, min - spread), max: min },
-      'Mid-Range': { min: min + 1, max: min + spread },
-      Premium: { min: min + spread + 1, max: min + spread * 2 },
-    };
-  }
-
-  const step = (max - min) / 3;
-  const budgetMax = Math.round(min + step);
-  const midMax = Math.round(min + step * 2);
-  return {
-    Budget: { min, max: budgetMax },
-    'Mid-Range': { min: budgetMax + 1, max: midMax },
-    Premium: { min: midMax + 1, max },
-  };
-}
-
-function artistRangeTagForValue(value, ranges) {
-  const v = Number(value);
-  if (!Number.isFinite(v)) return null;
-  if (v <= ranges.Budget.max) return 'Budget';
-  if (v <= ranges['Mid-Range'].max) return 'Mid-Range';
-  return 'Premium';
-}
-
 router.get('/all', async (req, res) => {
   try {
     const [
@@ -101,8 +60,6 @@ router.get('/all', async (req, res) => {
 
     const cityMap  = Object.fromEntries((cities ?? []).map(c => [c.slug, { mult: c.multiplier, label: c.label, region: c.region, id: c.id }]));
     const hotelMap = Object.fromEntries((hotelTiers ?? []).map(h => [h.slug, { label: h.label, roomRate: h.room_rate, costMult: h.cost_mult, decorMult: h.decor_mult, id: h.id }]));
-    const artistRanges = buildArtistPriceRanges(artists ?? []);
-
     const scrapedMapped = (scrapedDecor ?? [])
       .map(img => {
         const lbl = img.image_labels?.[0] ?? {};
@@ -127,24 +84,7 @@ router.get('/all', async (req, res) => {
 
     res.json({
       cities: cityMap, hotelTiers: hotelMap,
-      artists: (artists ?? []).map(a => {
-        const value = Number(a.cost_min ?? a.cost_max);
-        const priceRangeTag = artistRangeTagForValue(value, artistRanges);
-        const range = priceRangeTag ? artistRanges[priceRangeTag] : null;
-        return {
-          id: a.id,
-          slug: a.slug,
-          label: a.label,
-          type: a.artist_type,
-          isNamed: a.is_named,
-          costMin: a.cost_min,
-          costMax: a.cost_max,
-          priceRangeTag,
-          contributionMin: range?.min ?? null,
-          contributionMax: range?.max ?? null,
-        };
-      }),
-      artistRanges,
+      artists: (artists ?? []).map(a => ({ id: a.id, slug: a.slug, label: a.label, type: a.artist_type, isNamed: a.is_named, costMin: a.cost_min, costMax: a.cost_max })),
       meals: (meals ?? []).map(m => ({ id: m.id, slug: m.slug, label: m.label, costMinPH: m.cost_min_ph, costMaxPH: m.cost_max_ph })),
       barTiers: (barTiers ?? []).map(b => ({ id: b.id, slug: b.slug, label: b.label, costMinPH: b.cost_min_ph, costMaxPH: b.cost_max_ph })),
       specialtyCounters: (specialtyCounters ?? []).map(c => ({ id: c.id, slug: c.slug, label: c.label, costMin: c.cost_min, costMax: c.cost_max })),
