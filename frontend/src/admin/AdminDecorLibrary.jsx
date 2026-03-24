@@ -68,7 +68,10 @@ export default function AdminDecorLibrary() {
   const [loading, setLoading] = useState(true);
   const [scraped, setScraped] = useState([]);
   const [query, setQuery] = useState('');
+  const [priceFilter, setPriceFilter] = useState('All');
   const [error, setError] = useState('');
+
+  const PRICE_FILTERS = ['All', 'Budget', 'Mid-Range', 'Premium'];
 
   useEffect(() => {
     async function load() {
@@ -102,12 +105,14 @@ export default function AdminDecorLibrary() {
   const visible = useMemo(
     () => scraped.filter((item) => {
       const q = query.trim().toLowerCase();
+      const priceOk = priceFilter === 'All' || String(item.priceRangeTag || '') === priceFilter;
+      if (!priceOk) return false;
       if (!q) return true;
       return [item.label, item.function, item.style, item.status, item.priceRangeTag]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     }),
-    [scraped, query],
+    [scraped, query, priceFilter],
   );
 
   const S = {
@@ -130,10 +135,29 @@ export default function AdminDecorLibrary() {
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: '#666' }}>Total: <strong>{scraped.length}</strong></div>
+        {PRICE_FILTERS.map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setPriceFilter(filter)}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 20,
+              border: `1px solid ${priceFilter === filter ? '#7a1c1c' : '#e0d5c5'}`,
+              background: priceFilter === filter ? '#7a1c1c' : '#fff',
+              color: priceFilter === filter ? '#E8C97A' : '#6b7280',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: "'Jost',sans-serif",
+            }}
+          >
+            {filter}
+          </button>
+        ))}
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search title / function / style / status"
+          placeholder="Search title / function / style / status / price tag"
           style={{
             minWidth: 260,
             padding: '8px 10px',

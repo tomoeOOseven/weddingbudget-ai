@@ -164,7 +164,7 @@ router.get('/sources', requireAdmin, async (req, res) => {
   // Annotate which sources are currently running
   const sources = (data ?? []).map(s => ({
     ...s,
-    isRunning: runningJobs.has(s.id) || runningJobs.has('__ALL__'),
+    isRunning: runningJobs.has(s.id) || (runningJobs.has('__ALL__') && s.is_active),
   }));
 
   res.json({ sources });

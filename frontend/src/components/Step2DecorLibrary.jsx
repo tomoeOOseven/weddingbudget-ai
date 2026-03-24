@@ -5,15 +5,12 @@ import { scoreDecor } from '../api.js';
 import { FiActivity, FiCheck, FiImage } from 'react-icons/fi';
 
 export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
-  const [dFilter, setDFilter] = useState('All');
-  const [styleFilter, setStyleFilter] = useState('All');
+  const [priceFilter, setPriceFilter] = useState('All');
   const [mlScores, setMlScores]       = useState({});
   const [scoring, setScoring]         = useState(false);
 
   const decors  = refData?.decor ?? [];
   const scrapedCount = decors.filter((d) => d.source === 'scraped').length;
-  const funs    = refData?.functions ?? [];
-  const fnLabel = Object.fromEntries(funs.map(f => [f.id, f.label]));
 
   if (scrapedCount === 0) {
     return (
@@ -41,14 +38,12 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
     );
   }
 
-  const styles  = ['All', ...new Set(decors.map(d => d.style).filter(Boolean))];
-  const fnTabs  = ['All', ...funs.filter(f => inputs.functions.has(f.id)).map(f => f.label)];
+  const priceTabs = ['All', 'Budget', 'Mid-Range', 'Premium'];
 
   const visible = decors.filter(d => {
     const fnOk    = !inputs.functions.size || inputs.functions.has(d.function);
-    const tabOk   = dFilter === 'All' || fnLabel[d.function] === dFilter;
-    const styleOk = styleFilter === 'All' || d.style === styleFilter;
-    return fnOk && tabOk && styleOk;
+    const priceOk = priceFilter === 'All' || d.priceRangeTag === priceFilter;
+    return fnOk && priceOk;
   });
 
   // Stable key: sorted IDs joined — changes whenever any item is added, removed, or swapped
@@ -100,15 +95,7 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
 
       {/* Filters */}
       <div style={{ marginBottom:16 }}>
-        <FilterPills options={fnTabs} active={dFilter} onChange={setDFilter} />
-        <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
-          {styles.map(s => (
-            <button key={s} onClick={() => setStyleFilter(s)}
-              style={{ padding:'4px 12px', border:`1px solid ${styleFilter===s?'var(--maroon)':'var(--border)'}`, borderRadius:20, background:styleFilter===s?'var(--maroon)':'transparent', color:styleFilter===s?'#E8C97A':'var(--muted)', fontSize:11, cursor:'pointer', fontWeight:600 }}>
-              {s}
-            </button>
-          ))}
-        </div>
+        <FilterPills options={priceTabs} active={priceFilter} onChange={setPriceFilter} />
       </div>
 
       {/* Grid */}

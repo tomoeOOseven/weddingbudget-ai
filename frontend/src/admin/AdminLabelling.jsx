@@ -81,7 +81,7 @@ function ImageCard({ image, onClick, selected }) {
 }
 
 // ── Label Form ───────────────────────────────────────────────────────────────
-function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Label' }) {
+function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Label', currentSeedPrice = null, currentPriceRangeTag = null }) {
   const [form, setForm] = useState({
     function_type: initial.function_type ?? '',
     style:         initial.style         ?? '',
@@ -134,8 +134,12 @@ function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Lab
       <div style={S.row}>
         <div style={{ flex:1 }}>
           <label style={S.label}>Price Estimate (₹)</label>
-          <input style={S.input} type="number" value={form.price_estimate}
+          <input style={S.input} type="number" step={10000} min={1000} value={form.price_estimate}
             onChange={e => set('price_estimate', e.target.value)} placeholder="e.g. 75000" />
+          <div style={{ fontSize: 10, color: '#777', marginTop: 4 }}>
+            Current seed price: {currentSeedPrice ? formatINR(currentSeedPrice) : '—'}
+            {currentPriceRangeTag ? ` (${currentPriceRangeTag})` : ''}
+          </div>
         </div>
       </div>
       <div style={{ marginBottom:14 }}>
@@ -277,6 +281,8 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                     ? Math.round((Number(image.image_labels[0].cost_seed_min) + Number(image.image_labels[0].cost_seed_max)) / 2)
                     : ''),
               }}
+              currentSeedPrice={image.price_inr}
+              currentPriceRangeTag={image.price_range_tag}
               onSubmit={handleManualLabel}
               submitting={submitting}
             />
@@ -385,6 +391,8 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
                     complexity:    suggestion.suggested_complexity,
                     price_estimate: suggestion.suggested_price_estimate,
                   }}
+                  currentSeedPrice={image.price_inr}
+                  currentPriceRangeTag={image.price_range_tag}
                   onSubmit={(form) => handleSuggestion('edit', form)}
                   submitting={submitting}
                   submitLabel="Edit & Accept"

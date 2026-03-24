@@ -112,11 +112,25 @@ router.get('/image/:id', requireAdmin, async (req, res) => {
 router.post('/label', requireAdmin, async (req, res) => {
   const { imageId, function_type, style, complexity, price_estimate, notes } = req.body;
 
-  if (!imageId || !function_type || !style || !complexity) {
-    return res.status(400).json({ error: 'imageId, function_type, style, complexity are required.' });
+  if (!imageId) {
+    return res.status(400).json({ error: 'imageId is required.' });
   }
   if (price_estimate === undefined || price_estimate === null || Number.isNaN(Number(price_estimate))) {
     return res.status(400).json({ error: 'price_estimate is required.' });
+  }
+
+  const { data: existingLabel } = await supabaseAdmin
+    .from('image_labels')
+    .select('function_type, style, complexity')
+    .eq('image_id', imageId)
+    .maybeSingle();
+
+  const resolvedFunction = function_type || existingLabel?.function_type || null;
+  const resolvedStyle = style || existingLabel?.style || null;
+  const resolvedComplexity = complexity || existingLabel?.complexity || null;
+
+  if (!resolvedFunction || !resolvedStyle || !resolvedComplexity) {
+    return res.status(400).json({ error: 'function_type, style, complexity are required for first-time labelling.' });
   }
 
   const priceEstimate = Number.parseInt(price_estimate, 10);
@@ -126,9 +140,9 @@ router.post('/label', requireAdmin, async (req, res) => {
     .from('image_labels')
     .upsert({
       image_id:       imageId,
-      function_type,
-      style,
-      complexity,
+      function_type:  resolvedFunction,
+      style:          resolvedStyle,
+      complexity:     resolvedComplexity,
       cost_seed_min:  range.min,
       cost_seed_max:  range.max,
       label_source:   'manual',

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getToken } from '../lib/tokenStore.js';
 import { fetchFromApi } from '../lib/apiBase.js';
-import { FiCpu, FiImage } from 'react-icons/fi';
+import { FiArrowLeft, FiArrowRight, FiCpu, FiImage } from 'react-icons/fi';
 
 const HF_SPACE_BASE = 'https://gamerquant-wedding-decor-price.hf.space';
 const HF_GRADIO_RUN_PREDICT = `${HF_SPACE_BASE}/gradio_api/run/predict`;
@@ -177,110 +177,123 @@ export default function AdminInference() {
       {loading ? (
         <div style={{ color: '#999', fontSize: 13 }}>Loading scraped images...</div>
       ) : (
-        <div style={{ display: 'grid', gap: 14, gridTemplateColumns: '1fr 1fr' }}>
-          <div style={{ background: '#fff', border: '1px solid #eee4d8', borderRadius: 10, padding: 14 }}>
+        <div style={{ maxWidth: 860 }}>
+          <div style={{ background: '#fff', border: '1px solid #eee4d8', borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Select Scraped Image</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{
+              minHeight: 36,
+              border: '1px solid #e0d5c5',
+              borderRadius: 8,
+              padding: '8px 11px',
+              fontSize: 12,
+              color: '#333',
+              background: '#fff',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              marginBottom: 12,
+            }}>
+              {selected ? `${selected.title} (${selected.status})` : 'No image selected'}
+            </div>
+
+            <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: '#f5f0eb' }}>
+              {selected?.imageUrl ? (
+                <img src={selected.imageUrl} alt={selected.title} style={{ width: '100%', maxHeight: 380, objectFit: 'cover', display: 'block' }} />
+              ) : (
+                <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                  <FiImage size={28} />
+                </div>
+              )}
+
               <button
                 disabled={selectedIndex <= 0}
                 onClick={() => selectIndex(selectedIndex - 1)}
+                aria-label="Previous image"
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 8,
-                  border: '1px solid #e0d5c5',
-                  background: selectedIndex <= 0 ? '#f3f4f6' : '#fff',
-                  color: selectedIndex <= 0 ? '#9ca3af' : '#7a1c1c',
-                  fontWeight: 700,
+                  position: 'absolute',
+                  left: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: selectedIndex <= 0 ? 'rgba(120,120,120,0.55)' : 'rgba(35,12,20,0.75)',
+                  color: '#fff',
                   cursor: selectedIndex <= 0 ? 'default' : 'pointer',
+                  display: 'grid',
+                  placeItems: 'center',
                 }}
               >
-                {'<'}
+                <FiArrowLeft />
               </button>
-
-              <div style={{
-                flex: 1,
-                minHeight: 34,
-                border: '1px solid #e0d5c5',
-                borderRadius: 8,
-                padding: '7px 10px',
-                fontSize: 12,
-                color: '#333',
-                background: '#fff',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}>
-                {selected ? `${selected.title} (${selected.status})` : 'No image selected'}
-              </div>
 
               <button
                 disabled={selectedIndex < 0 || selectedIndex >= images.length - 1}
                 onClick={() => selectIndex(selectedIndex + 1)}
+                aria-label="Next image"
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 8,
-                  border: '1px solid #e0d5c5',
-                  background: selectedIndex < 0 || selectedIndex >= images.length - 1 ? '#f3f4f6' : '#fff',
-                  color: selectedIndex < 0 || selectedIndex >= images.length - 1 ? '#9ca3af' : '#7a1c1c',
-                  fontWeight: 700,
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: selectedIndex < 0 || selectedIndex >= images.length - 1 ? 'rgba(120,120,120,0.55)' : 'rgba(35,12,20,0.75)',
+                  color: '#fff',
                   cursor: selectedIndex < 0 || selectedIndex >= images.length - 1 ? 'default' : 'pointer',
+                  display: 'grid',
+                  placeItems: 'center',
                 }}
               >
-                {'>'}
+                <FiArrowRight />
               </button>
             </div>
 
-            <button
-              onClick={handlePredictClick}
-              disabled={!selectedImageId || predicting}
-              style={{
-                marginTop: 12,
-                padding: '10px 16px',
-                background: !selectedImageId || predicting ? '#eee' : '#7a1c1c',
-                border: 'none',
-                borderRadius: 8,
-                color: !selectedImageId || predicting ? '#aaa' : '#E8C97A',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: !selectedImageId || predicting ? 'default' : 'pointer',
-                fontFamily: "'Jost',sans-serif",
-              }}
-            >
-              {predicting ? 'Predicting...' : 'Predict Cost'}
-            </button>
+            <div style={{ marginTop: 8, fontSize: 12, color: '#444' }}>{selected?.title || 'No image selected'}</div>
 
-            {message && <div style={{ marginTop: 10, fontSize: 12, color: '#0369a1' }}>{message}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button
+                onClick={handlePredictClick}
+                disabled={!selectedImageId || predicting}
+                style={{
+                  padding: '10px 16px',
+                  background: !selectedImageId || predicting ? '#eee' : '#7a1c1c',
+                  border: 'none',
+                  borderRadius: 8,
+                  color: !selectedImageId || predicting ? '#aaa' : '#E8C97A',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: !selectedImageId || predicting ? 'default' : 'pointer',
+                  fontFamily: "'Jost',sans-serif",
+                }}
+              >
+                {predicting ? 'Predicting...' : 'Predict Cost'}
+              </button>
+            </div>
+
+            {message && <div style={{ marginTop: 10, fontSize: 12, color: '#0369a1', textAlign: 'right' }}>{message}</div>}
 
             {prediction && (
-              <div style={{ marginTop: 12, border:'1px solid #e0d5c5', borderRadius:8, padding:10, background:'#faf7f2' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#333', marginBottom: 6 }}>Inference Response</div>
-                {(() => {
-                  const summary = extractInferenceSummary(prediction);
-                  return (
-                    <div style={{ fontSize: 12, color: '#333', lineHeight: 1.8 }}>
-                      <div><strong>Predicted Tier:</strong> {summary.predictedTier}</div>
-                      <div><strong>Price Range:</strong> {summary.priceRange}</div>
-                      <div><strong>Confidence:</strong> {summary.confidence}</div>
-                      <div><strong>Inference Time:</strong> {summary.inferenceTime}</div>
-                    </div>
-                  );
-                })()}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                <div style={{ width: 'min(420px, 100%)', border:'1px solid #e0d5c5', borderRadius:8, padding:10, background:'#faf7f2' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#333', marginBottom: 6 }}>Inference Response</div>
+                  {(() => {
+                    const summary = extractInferenceSummary(prediction);
+                    return (
+                      <div style={{ fontSize: 12, color: '#333', lineHeight: 1.8 }}>
+                        <div><strong>Predicted Tier:</strong> {summary.predictedTier}</div>
+                        <div><strong>Price Range:</strong> {summary.priceRange}</div>
+                        <div><strong>Confidence:</strong> {summary.confidence}</div>
+                        <div><strong>Inference Time:</strong> {summary.inferenceTime}</div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             )}
-          </div>
-
-          <div style={{ background: '#fff', border: '1px solid #eee4d8', borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Preview</div>
-            {selected?.imageUrl ? (
-              <img src={selected.imageUrl} alt={selected.title} style={{ width: '100%', maxHeight: 320, objectFit: 'cover', borderRadius: 8 }} />
-            ) : (
-              <div style={{ height: 220, borderRadius: 8, background: '#f5f0eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                <FiImage size={28} />
-              </div>
-            )}
-            <div style={{ marginTop: 8, fontSize: 12, color: '#444' }}>{selected?.title || 'No image selected'}</div>
           </div>
         </div>
       )}

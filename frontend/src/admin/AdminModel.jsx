@@ -63,8 +63,6 @@ function sleep(ms) {
 
 export default function AdminModel() {
   const [versions, setVersions]     = useState([]);
-  const [mlHealth, setMlHealth]     = useState(null);
-  const [statusError, setStatusError] = useState('');
   const [trainingStats, setTrainingStats] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [training, setTraining]     = useState(false);
@@ -82,13 +80,9 @@ export default function AdminModel() {
         apiFetch('/api/labelling/stats'),
       ]);
       setVersions(normalizeVersions(statusData.versions ?? []));
-      setMlHealth(statusData.mlHealth);
       setTrainingStats(statsData);
-      setStatusError('');
     } catch (e) {
       console.error(e);
-      setStatusError(e?.message || 'Could not load model status.');
-      setMlHealth(null);
     }
     finally { setLoading(false); }
   }, []);
@@ -172,7 +166,6 @@ export default function AdminModel() {
   }
 
   const activeVersion = versions.find(v => v.is_active);
-  const hfManaged = mlHealth?.disabled || /ML pipeline disabled/i.test(String(mlHealth?.error || ''));
 
   const S = {
     title: { fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:'#1a0a0a', margin:0 },
@@ -193,54 +186,6 @@ export default function AdminModel() {
     <div style={{ fontFamily:"'Jost',sans-serif" }}>
       <h1 style={S.title}><FiActivity style={{ verticalAlign: 'middle', marginRight: 8 }} />Model Training</h1>
       <p style={S.sub}>Train, evaluate, and promote cost prediction models.</p>
-
-      {/* ML Service health */}
-      <div style={{ ...S.card, marginBottom:20, display:'flex', alignItems:'center', gap:12 }}>
-        <div style={{ width:10, height:10, borderRadius:'50%',
-          background: hfManaged ? '#16a34a' : (statusError ? '#d97706' : (mlHealth?.available ? '#16a34a' : (mlHealth?.warming_up ? '#d97706' : '#dc2626'))) }} />
-        <div style={{ fontSize:13 }}>
-          ML Service: <strong>
-            {hfManaged
-              ? 'Managed by Hugging Face'
-              : statusError
-              ? 'Status Unavailable'
-              : (mlHealth?.available
-                ? 'Online'
-                : (mlHealth?.warming_up ? 'Warming Up' : 'Offline'))}
-          </strong>
-          {hfManaged && (
-            <div style={{ color:'#64748b', marginTop:4, fontSize:11 }}>
-              Local ML pipeline is disabled by config; retraining and inference use Hugging Face endpoints.
-            </div>
-          )}
-          {mlHealth?.available && (
-            <span style={{ color:'#888', marginLeft:12 }}>
-              CLIP {mlHealth.clip_available ? 'loaded' : 'not available'} ·
-              Model in memory: {mlHealth.model_loaded ? 'loaded' : 'not loaded'}
-            </span>
-          )}
-          {!hfManaged && !mlHealth?.available && mlHealth?.warming_up && !statusError && (
-            <div style={{ color:'#b45309', marginTop:4, fontSize:11 }}>
-              ML service is reachable but warming up (gateway {mlHealth.status_code ?? 'transient'}). Retry in 20-40s.
-            </div>
-          )}
-          {!hfManaged && !mlHealth?.available && mlHealth?.checked_url && !statusError && (
-            <div style={{ color:'#999', marginTop:4, fontSize:11 }}>
-              Checked: {mlHealth.checked_url}
-            </div>
-          )}
-          {!hfManaged && !mlHealth?.available && mlHealth?.error && !statusError && (
-            <div style={{ color:'#b45309', marginTop:2, fontSize:11 }}>
-              Error: {mlHealth.error}
-            </div>
-          )}
-          {statusError && (
-            <div style={{ color:'#b45309', marginTop:4, fontSize:11 }}>
-              Could not fetch model status: {statusError}
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Active model metrics */}
       {activeVersion && (
