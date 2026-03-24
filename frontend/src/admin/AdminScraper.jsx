@@ -134,10 +134,12 @@ export default function AdminScraper() {
 
   const loadLiveStats = useCallback(async () => {
     try {
-      const [jobData, statsData] = await Promise.all([
+      const [srcData, jobData, statsData] = await Promise.all([
+        apiFetch('/api/scraper/sources'),
         apiFetch('/api/scraper/jobs?limit=10'),
         apiFetch('/api/scraper/stats'),
       ]);
+      setSources(srcData.sources ?? []);
       setJobs(jobData.jobs ?? []);
       setStats(statsData);
     } catch {
@@ -169,8 +171,9 @@ export default function AdminScraper() {
         method:'POST',
         body: JSON.stringify({ sourceId, pageMin: Number(pageMin), pageMax: Number(pageMax) }),
       });
+      setSources(prev => prev.map((s) => s.id === sourceId ? { ...s, isRunning: true } : s));
       setMsg(`Scrape started for ${sourceName}`);
-      setTimeout(loadLiveStats, 1000);
+      setTimeout(loadLiveStats, 400);
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setRunning(r => ({ ...r, [sourceId]: false })); }
   }
@@ -183,8 +186,9 @@ export default function AdminScraper() {
         method:'POST',
         body: JSON.stringify({ all: true, pageMin: Number(pageMin), pageMax: Number(pageMax) }),
       });
+      setSources(prev => prev.map((s) => s.is_active ? { ...s, isRunning: true } : s));
       setMsg('All-source scrape started in background');
-      setTimeout(loadLiveStats, 1000);
+      setTimeout(loadLiveStats, 400);
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setRunning(r => ({ ...r, __ALL__: false })); }
   }
