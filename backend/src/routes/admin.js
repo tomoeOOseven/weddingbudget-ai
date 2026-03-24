@@ -1,6 +1,8 @@
 // routes/admin.js — cost data management with full audit trail
 const express = require('express');
 const router  = express.Router();
+const axios = require('axios');
+const crypto = require('crypto');
 const { requireAdmin, supabaseAdmin } = require('../middleware/authMiddleware');
 const { getHomepageContent, saveHomepageContent } = require('../lib/siteContentStore');
 
@@ -53,6 +55,69 @@ function parseArtistNotes(notes) {
     out[k.trim()] = rest.join('=').trim();
   });
   return out;
+}
+
+function normalizeArtistNotes(baseNotes, patch = {}) {
+  const meta = parseArtistNotes(baseNotes);
+  Object.entries(patch).forEach(([k, v]) => {
+    if (v === null || v === undefined || v === '') delete meta[k];
+    else meta[k] = String(v);
+  });
+  const plain = String(baseNotes || '')
+    .split('|')
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .filter((chunk) => !chunk.includes('='));
+  const kv = Object.entries(meta).map(([k, v]) => `${k}=${v}`);
+  return [...plain, ...kv].join(' | ');
+}
+
+function extFromContentType(contentType) {
+  const t = String(contentType || '').toLowerCase();
+  if (t.includes('image/png')) return 'png';
+  if (t.includes('image/webp')) return 'webp';
+  if (t.includes('image/avif')) return 'avif';
+  if (t.includes('image/gif')) return 'gif';
+  return 'jpg';
+}
+
+async function resolveArtistImageUrl(imageUrl) {
+  const src = String(imageUrl || '').trim();
+  if (!src) return null;
+  if (!/^https?:\/\//i.test(src)) return src;
+
+  const response = await axios.get(src, {
+    responseType: 'arraybuffer',
+    timeout: 15000,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; WeddingBudgetAI/1.0)',
+      Accept: 'image/*',
+    },
+  });
+
+  const contentType = response.headers['content-type'] || 'image/jpeg';
+  if (!String(contentType).toLowerCase().startsWith('image/')) {
+    throw new Error('image_url did not return an image content type');
+  }
+
+  const ext = extFromContentType(contentType);
+  const random = crypto.randomBytes(8).toString('hex');
+  const ym = new Date().toISOString().slice(0, 7);
+  const storagePath = `artists/${ym}/${Date.now()}-${random}.${ext}`;
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from('decor-images')
+    .upload(storagePath, Buffer.from(response.data), {
+      contentType,
+      upsert: false,
+      cacheControl: '2592000',
+    });
+
+  if (uploadError) {
+    throw new Error(`failed to store artist image: ${uploadError.message}`);
+  }
+
+  return `${process.env.SUPABASE_URL}/storage/v1/object/public/decor-images/${storagePath}`;
 }
 
 async function getCurrentArtistRanges(incomingPrice = null) {
@@ -131,6 +196,15 @@ router.post('/artists', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'price_inr must be a valid number >= 1000.' });
   }
 
+  let storedImageUrl = image_url ?? null;
+  if (image_url) {
+    try {
+      storedImageUrl = await resolveArtistImageUrl(image_url);
+    } catch (err) {
+      return res.status(400).json({ error: `Could not process image_url: ${err.message}` });
+    }
+  }
+
   const ranges = await getCurrentArtistRanges(price);
   const price_range_tag = tagFromPrice(price, ranges);
   const range = ranges[price_range_tag];
@@ -144,7 +218,7 @@ router.post('/artists', requireAdmin, async (req, res) => {
     price_range_tag,
     cost_min: range.min,
     cost_max: range.max,
-    image_url: image_url ?? null,
+    image_url: storedImageUrl,
     profile_url: profile_url ?? null,
     is_named,
     notes,
@@ -155,9 +229,12 @@ router.post('/artists', requireAdmin, async (req, res) => {
     error?.message?.toLowerCase().includes('column') &&
     (error?.message?.toLowerCase().includes('does not exist') || error?.message?.toLowerCase().includes('could not find'))
   ) {
-    const mergedNotes = [notes, `price_inr=${price}`, `price_range_tag=${price_range_tag}`, image_url ? `image_url=${image_url}` : null, profile_url ? `profile_url=${profile_url}` : null]
-      .filter(Boolean)
-      .join(' | ');
+    const mergedNotes = normalizeArtistNotes(notes, {
+      price_inr: price,
+      price_range_tag,
+      image_url: storedImageUrl,
+      profile_url: profile_url ?? null,
+    });
     ({ data, error } = await supabaseAdmin.from('artists').insert({
       slug,
       label,
@@ -176,6 +253,15 @@ router.post('/artists', requireAdmin, async (req, res) => {
 
 router.put('/artists/:id', requireAdmin, async (req, res) => {
   const updates = { ...req.body };
+
+  if (updates.image_url != null) {
+    try {
+      updates.image_url = await resolveArtistImageUrl(updates.image_url);
+    } catch (err) {
+      return res.status(400).json({ error: `Could not process image_url: ${err.message}` });
+    }
+  }
+
   if (updates.price_inr != null) {
     const price = Math.round(Number(updates.price_inr));
     if (!Number.isFinite(price) || price < 1000) {
@@ -195,7 +281,22 @@ router.put('/artists/:id', requireAdmin, async (req, res) => {
     error?.message?.toLowerCase().includes('column') &&
     (error?.message?.toLowerCase().includes('does not exist') || error?.message?.toLowerCase().includes('could not find'))
   ) {
+    let existingNotes = updates.notes;
+    if (existingNotes == null) {
+      const { data: existing } = await supabaseAdmin
+        .from('artists')
+        .select('notes')
+        .eq('id', req.params.id)
+        .maybeSingle();
+      existingNotes = existing?.notes ?? '';
+    }
     const fallbackUpdates = { ...updates };
+    fallbackUpdates.notes = normalizeArtistNotes(existingNotes, {
+      price_inr: updates.price_inr,
+      price_range_tag: updates.price_range_tag,
+      image_url: updates.image_url,
+      profile_url: updates.profile_url,
+    });
     delete fallbackUpdates.price_inr;
     delete fallbackUpdates.price_range_tag;
     delete fallbackUpdates.image_url;

@@ -10,7 +10,9 @@ function createInitialInputs() {
   outstationPct: 60,
   functions:   new Set(['mehendi','sangeet','baraat','pheras','reception']),
   selectedDecors:    new Set(),
+  selectedDecorMeta: {},
   selectedArtists:   new Set(),
+  selectedArtistMeta: {},
   selectedMeals:     new Set(['welcome','gala']),
   barTier:           'wine',
   specialtyCounters: new Set(['chaat','mocktail']),
@@ -34,7 +36,7 @@ function ensureSet(value, fallbackSet) {
 
 function buildArtistPriceRanges(artists) {
   const values = (artists ?? [])
-    .map((a) => Number(a.costMin ?? a.costMax))
+    .map((a) => Number(a.priceInr ?? a.costMin ?? a.costMax))
     .filter((v) => Number.isFinite(v));
   if (!values.length) {
     return {
@@ -82,7 +84,20 @@ function decorBoundsFromTag(tag) {
 
 export function serializeBudgetInputs(inputs) {
   return {
-    ...inputs,
+    city: inputs.city,
+    hotelTier: inputs.hotelTier,
+    rooms: inputs.rooms,
+    guests: inputs.guests,
+    outstationPct: inputs.outstationPct,
+    barTier: inputs.barTier,
+    transfers: inputs.transfers,
+    ghodi: inputs.ghodi,
+    dholis: inputs.dholis,
+    roomBaskets: inputs.roomBaskets,
+    rituals: inputs.rituals,
+    gifts: inputs.gifts,
+    stationery: inputs.stationery,
+    photography: inputs.photography,
     functions: [...inputs.functions],
     selectedDecors: [...inputs.selectedDecors],
     selectedArtists: [...inputs.selectedArtists],
@@ -108,7 +123,9 @@ export function normalizeBudgetInputs(raw = {}) {
     outstationPct: Number.isFinite(Number(raw.outstationPct)) ? Number(raw.outstationPct) : initial.outstationPct,
     functions: ensureSet(raw.functions, initial.functions),
     selectedDecors: ensureSet(raw.selectedDecors, initial.selectedDecors),
+    selectedDecorMeta: {},
     selectedArtists: ensureSet(raw.selectedArtists, initial.selectedArtists),
+    selectedArtistMeta: {},
     selectedMeals: ensureSet(raw.selectedMeals, initial.selectedMeals),
     barTier: raw.barTier ?? initial.barTier,
     specialtyCounters: ensureSet(raw.specialtyCounters, initial.specialtyCounters),
@@ -129,10 +146,26 @@ export function useBudget(refData) {
   const [step, setStep]     = useState(1);
 
   const set    = useCallback((key, val) => setInputs(p => ({ ...p, [key]: val })), []);
-  const toggle = useCallback((key, id) => setInputs(p => {
+  const toggle = useCallback((key, id, meta = null) => setInputs((p) => {
     const s = new Set(p[key]);
-    s.has(id) ? s.delete(id) : s.add(id);
-    return { ...p, [key]: s };
+    const had = s.has(id);
+    if (had) s.delete(id);
+    else s.add(id);
+
+    const next = { ...p, [key]: s };
+    if (key === 'selectedArtists' && meta) {
+      const map = { ...(p.selectedArtistMeta ?? {}) };
+      if (had) delete map[id];
+      else map[id] = meta;
+      next.selectedArtistMeta = map;
+    }
+    if (key === 'selectedDecors' && meta) {
+      const map = { ...(p.selectedDecorMeta ?? {}) };
+      if (had) delete map[id];
+      else map[id] = meta;
+      next.selectedDecorMeta = map;
+    }
+    return next;
   }), []);
   const hydrateInputs = useCallback((nextInputs) => setInputs(normalizeBudgetInputs(nextInputs)), []);
   const resetInputs = useCallback(() => setInputs(createInitialInputs()), []);
@@ -174,7 +207,7 @@ export function useBudget(refData) {
     if (inputs.selectedDecors.size > 0) {
       let selectedCount = 0;
       [...inputs.selectedDecors].forEach(dId => {
-        const d = DECORS.find(x => x.id === dId);
+        const d = DECORS.find(x => x.id === dId) || inputs.selectedDecorMeta?.[dId];
         if (d) {
           selectedCount += 1;
           const range = decorBoundsFromTag(d.priceRangeTag);
@@ -188,8 +221,8 @@ export function useBudget(refData) {
           } else {
             items.push({
               cat: 'Décor & Design', sub: d.label,
-              min: (d.costMin ?? 0) * (hd.decorMult ?? 1) * cm * 0.9,
-              max: (d.costMax ?? 0) * (hd.decorMult ?? 1) * cm * 1.1,
+              min: (Number(d.costMin ?? d.cost_seed_min) || 0) * (hd.decorMult ?? 1) * cm * 0.9,
+              max: (Number(d.costMax ?? d.cost_seed_max ?? d.costMin ?? d.cost_seed_min) || 0) * (hd.decorMult ?? 1) * cm * 1.1,
             });
           }
         }
@@ -233,9 +266,9 @@ export function useBudget(refData) {
     if (inputs.selectedArtists.size > 0) {
       let aMin = 0, aMax = 0;
       [...inputs.selectedArtists].forEach(aId => {
-        const a = ARTISTS.find(x => x.id === aId || x.slug === aId);
+        const a = ARTISTS.find(x => x.id === aId || x.slug === aId) || inputs.selectedArtistMeta?.[aId];
         if (a) {
-          const baseValue = Number(a.costMin ?? a.costMax);
+          const baseValue = Number(a.priceInr ?? a.costMin ?? a.costMax);
           const tag = a.priceRangeTag || artistTagFromValue(baseValue, ARTIST_RANGES);
           const bucket = tag ? ARTIST_RANGES[tag] : null;
           if (bucket) {

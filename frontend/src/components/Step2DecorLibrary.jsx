@@ -8,6 +8,19 @@ function decorBoundsFromTag(tag) {
   if (tag === 'Budget') return { min: 1000, max: 15000 };
   if (tag === 'Mid-Range') return { min: 15001, max: 80000 };
   if (tag === 'Premium') return { min: 80001, max: 500000 };
+  return null;
+}
+
+function fallbackRangeFromSeed(d) {
+  const min = Number(d?.cost_seed_min);
+  const max = Number(d?.cost_seed_max);
+  if (Number.isFinite(min) && Number.isFinite(max) && max >= min) {
+    return { min, max };
+  }
+  const p = Number(d?.priceInr);
+  if (Number.isFinite(p) && p > 0) {
+    return { min: Math.max(1000, Math.round(p * 0.9)), max: Math.round(p * 1.1) };
+  }
   return { min: 0, max: 0 };
 }
 
@@ -17,7 +30,7 @@ function rangePillColor(tag) {
   return { bg: '#FDE8E8', fg: '#991B1B' };
 }
 
-export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
+export default function Step2DecorLibrary({ inputs, toggle, cm, hd }) {
   const [priceFilter, setPriceFilter] = useState('All');
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
@@ -66,43 +79,17 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
     return map;
   }, [decors, selectedMeta]);
 
-  const scrapedCount = Number(refData?.decor?.length ?? 0);
-
-  if (scrapedCount === 0) {
-    return (
-      <div>
-        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:32, fontWeight:600, color:'var(--maroon)', marginBottom:4 }}>
-          Decor Library
-        </div>
-        <div style={{ fontSize:14, color:'var(--muted)', marginBottom:20, fontWeight:300 }}>
-          Scraped decor library is currently empty.
-        </div>
-        <div style={{
-          background:'#fff', border:'2px dashed rgba(0,0,0,0.1)',
-          borderRadius:12, padding:'48px 32px', textAlign:'center',
-        }}>
-          <div style={{ fontSize:48, marginBottom:12 }}><FiImage /></div>
-          <div style={{ fontSize:16, fontWeight:600, color:'#333', marginBottom:8 }}>
-            Decor Library - Coming next
-          </div>
-          <div style={{ fontSize:13, color:'#999', maxWidth:420, margin:'0 auto', lineHeight:1.6 }}>
-            This module will be implemented in the next build step. The database schema and
-            API routes are ready - the UI just needs wiring up.
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const priceTabs = ['All', 'Budget', 'Mid-Range', 'Premium'];
 
   const visible = decors;
 
   function getCostRange(d) {
     const base = decorBoundsFromTag(d.priceRangeTag);
+    const seed = fallbackRangeFromSeed(d);
+    const src = base ?? seed;
     return {
-      min: Math.round(base.min * (hd?.decorMult ?? 1) * cm),
-      max: Math.round(base.max * (hd?.decorMult ?? 1) * cm),
+      min: Math.round(src.min * (hd?.decorMult ?? 1) * cm),
+      max: Math.round(src.max * (hd?.decorMult ?? 1) * cm),
     };
   }
 
@@ -112,7 +99,7 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
         Décor Library
       </div>
       <div style={{ fontSize:14, color:'var(--muted)', marginBottom:20, fontWeight:300 }}>
-        Browse {decors.filter(d => d.source === 'scraped').length > 0 ? `${decors.length} designs (${decors.filter(d=>d.source==='scraped').length} from our scraper) ·` : ''} AI maps style & complexity to cost ranges
+        Browse DB-backed scraped decor mapped to realistic cost ranges.
       </div>
 
       {/* Filters */}
@@ -134,7 +121,7 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
           const pill = rangePillColor(tag);
           return (
             <div key={d.id} onClick={() => {
-              toggle('selectedDecors', d.id);
+              toggle('selectedDecors', d.id, d);
               setSelectedMeta((prev) => ({ ...prev, [d.id]: d }));
             }} style={{
               borderRadius:10, cursor:'pointer', overflow:'hidden',
@@ -144,9 +131,9 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
               boxShadow: on ? '0 4px 12px rgba(196,151,61,0.2)' : 'none',
             }}>
               {/* Image */}
-              {d.imageUrl ? (
+              {(d.imageUrl || d.publicUrl) ? (
                 <div style={{ height:120, overflow:'hidden', background:'#f5f0eb' }}>
-                  <img src={d.imageUrl} alt={d.label} style={{ width:'100%', height:'100%', objectFit:'cover' }}
+                  <img src={d.imageUrl || d.publicUrl} alt={d.label} style={{ width:'100%', height:'100%', objectFit:'cover' }}
                     onError={e => { e.target.parentElement.innerHTML = `<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f5f0eb">IMG</div>`; }} />
                 </div>
               ) : (

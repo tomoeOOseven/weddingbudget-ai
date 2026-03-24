@@ -99,7 +99,7 @@ export default function Step3Artists({ inputs, toggle, refData }) {
           const c = pillColor(tag);
           return (
             <div key={a.id} onClick={() => {
-              toggle('selectedArtists', a.id);
+              toggle('selectedArtists', a.id, a);
               setSelectedMeta((prev) => ({ ...prev, [a.id]: a }));
             }} style={{
               background: on ? '#FBF0DC' : '#fff',

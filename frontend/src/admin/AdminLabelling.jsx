@@ -27,6 +27,15 @@ function formatINR(n) {
   return '₹' + Number(n).toLocaleString('en-IN');
 }
 
+function derivePriceRangeTag(priceInr) {
+  if (!Number.isFinite(Number(priceInr))) return null;
+  const p = Number(priceInr);
+  if (p >= 1000 && p < 15000) return 'Budget';
+  if (p >= 15000 && p < 80000) return 'Mid-Range';
+  if (p >= 80000 && p <= 500000) return 'Premium';
+  return null;
+}
+
 // ── Stat Pill ────────────────────────────────────────────────────────────────
 function StatPill({ label, value, color = '#7a1c1c' }) {
   return (
@@ -109,6 +118,11 @@ function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Lab
 
   const set   = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const valid = form.price_estimate !== '';
+  const nudgePrice = (delta) => {
+    const current = Number(form.price_estimate || currentSeedPrice || 0);
+    const next = Math.max(1000, Math.round((Number.isFinite(current) ? current : 0) + delta));
+    set('price_estimate', String(next));
+  };
 
   const S = {
     row:   { display:'flex', gap:12, marginBottom:14 },
@@ -150,8 +164,26 @@ function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Lab
       <div style={S.row}>
         <div style={{ flex:1 }}>
           <label style={S.label}>Price Estimate (₹)</label>
-          <input style={S.input} type="number" step={10000} min={1000} value={form.price_estimate}
-            onChange={e => set('price_estimate', e.target.value)} placeholder="e.g. 75000" />
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <button
+              type="button"
+              onClick={() => nudgePrice(-10000)}
+              style={{ width:30, height:30, border:'1px solid #e0d5c5', background:'#fff', borderRadius:6, cursor:'pointer', fontWeight:700, color:'#7a1c1c' }}
+              title="Decrease by 10,000"
+            >
+              -
+            </button>
+            <input style={S.input} type="number" step={10000} min={1000} value={form.price_estimate}
+              onChange={e => set('price_estimate', e.target.value)} placeholder="e.g. 75000" />
+            <button
+              type="button"
+              onClick={() => nudgePrice(10000)}
+              style={{ width:30, height:30, border:'1px solid #e0d5c5', background:'#fff', borderRadius:6, cursor:'pointer', fontWeight:700, color:'#7a1c1c' }}
+              title="Increase by 10,000"
+            >
+              +
+            </button>
+          </div>
           <div style={{ fontSize: 10, color: '#777', marginTop: 4 }}>
             Current seed price: {currentSeedPrice ? formatINR(currentSeedPrice) : '—'}
             {currentPriceRangeTag ? ` (${currentPriceRangeTag})` : ''}
@@ -189,7 +221,9 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
         body: JSON.stringify({ imageId: image.id, ...form }),
       });
       setMsg('Labelled and added to training set.');
-      onLabelled(image.id);
+      onLabelled(image.id, {
+        priceEstimate: Number(form.price_estimate),
+      });
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setSubmitting(false); }
   }
@@ -228,7 +262,11 @@ function ImageDrawer({ image, bypass, onClose, onLabelled }) {
         setTab('manual');
       } else {
         setMsg(`${action === 'edit' ? 'Edited and accepted' : 'Accepted'} - added to training set.`);
-        onLabelled(image.id);
+        const edited = Number(overrides?.price_estimate);
+        const suggested = Number(suggestion?.suggested_price_estimate);
+        onLabelled(image.id, {
+          priceEstimate: action === 'edit' && Number.isFinite(edited) ? edited : (Number.isFinite(suggested) ? suggested : null),
+        });
       }
     } catch (e) { setMsg(`Error: ${e.message}`); }
     finally { setSubmitting(false); }
@@ -484,8 +522,30 @@ export default function AdminLabelling() {
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { loadImages(); setSelected(null); }, [loadImages]);
 
-  function handleLabelled(imageId) {
-    setImages(imgs => imgs.map(img => img.id === imageId ? { ...img, status: 'labelled' } : img));
+  function handleLabelled(imageId, updates = {}) {
+    const priceEstimate = Number(updates.priceEstimate);
+    const priceRangeTag = Number.isFinite(priceEstimate) ? derivePriceRangeTag(priceEstimate) : null;
+
+    setImages(imgs => imgs.map((img) => {
+      if (img.id !== imageId) return img;
+      const next = { ...img, status: 'labelled' };
+      if (Number.isFinite(priceEstimate)) {
+        next.price_inr = priceEstimate;
+        next.price_range_tag = priceRangeTag;
+      }
+      return next;
+    }));
+
+    setSelected((prev) => {
+      if (!prev || prev.id !== imageId) return null;
+      const next = { ...prev, status: 'labelled' };
+      if (Number.isFinite(priceEstimate)) {
+        next.price_inr = priceEstimate;
+        next.price_range_tag = priceRangeTag;
+      }
+      return next;
+    });
+
     loadStats();
     setSelected(null);
   }
