@@ -70,6 +70,7 @@ export default function AdminInference() {
   const [loading, setLoading] = useState(true);
   const [images, setImages] = useState([]);
   const [selectedImageId, setSelectedImageId] = useState('');
+  const [modelSelector, setModelSelector] = useState('active');
   const [predicting, setPredicting] = useState(false);
   const [prediction, setPrediction] = useState(null);
   const [message, setMessage] = useState('');
@@ -78,7 +79,10 @@ export default function AdminInference() {
     async function loadImages() {
       setLoading(true);
       try {
-        const data = await apiFetch('/api/scraper/images?limit=200');
+        const [data, modelStatus] = await Promise.all([
+          apiFetch('/api/scraper/images?limit=200'),
+          apiFetch('/api/model/status').catch(() => null),
+        ]);
         const list = (data.images ?? []).map((img) => ({
           ...img,
           id: img.id,
@@ -86,6 +90,11 @@ export default function AdminInference() {
           imageUrl: img.publicUrl || img.image_url || img.image_url || null,
           status: img.status,
         }));
+
+        const activeVersion = (modelStatus?.versions ?? []).find((v) => v.is_active);
+        const activeVersionLabel = String(activeVersion?.version_label || '').trim();
+        setModelSelector(activeVersionLabel ? `version:${activeVersionLabel}` : 'active');
+
         setImages(list);
         if (list.length > 0) setSelectedImageId(list[0].id);
       } catch (e) {
@@ -151,7 +160,7 @@ export default function AdminInference() {
           selected.title || 'test decor',
           sourceDomain || 'wedmegood.com',
           listingUrl || '',
-          'active',
+          modelSelector,
         ],
       };
 
