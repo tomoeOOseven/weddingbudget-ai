@@ -214,7 +214,7 @@ export default function AdminInference() {
               ))}
             </select>
 
-            <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: '#f5f0eb', width: '100%', aspectRatio: '1 / 1' }}>
+            <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: '#f5f0eb', width: '100%', aspectRatio: '4 / 3' }}>
               {selected?.imageUrl ? (
                 <img src={selected.imageUrl} alt={selected.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', background: '#f5f0eb' }} />
               ) : (
