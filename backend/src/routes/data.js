@@ -3,16 +3,6 @@ const express = require('express');
 const router  = express.Router();
 const { supabase } = require('../lib/supabaseClient');
 
-function parseArtistNotes(notes) {
-  const out = {};
-  String(notes || '').split('|').forEach((chunk) => {
-    const [k, ...rest] = chunk.split('=');
-    if (!k || rest.length === 0) return;
-    out[k.trim()] = rest.join('=').trim();
-  });
-  return out;
-}
-
 function derivePriceRangeTag(priceInr) {
   if (!Number.isFinite(Number(priceInr))) return null;
   const p = Number(priceInr);
@@ -31,50 +21,6 @@ function rangeBounds(tag, fallbackPrice) {
     return { min: Math.max(1000, Math.round(p * 0.9)), max: Math.round(p * 1.1) };
   }
   return null;
-}
-
-function buildArtistPriceRanges(artists) {
-  const values = (artists ?? [])
-    .map((a) => {
-      const meta = parseArtistNotes(a.notes);
-      return Number(a.price_inr ?? meta.price_inr ?? a.cost_min ?? a.cost_max);
-    })
-    .filter((v) => Number.isFinite(v));
-  if (!values.length) {
-    return {
-      Budget: { min: 10000, max: 30000 },
-      'Mid-Range': { min: 30001, max: 70000 },
-      Premium: { min: 70001, max: 150000 },
-    };
-  }
-
-  const min = Math.round(Math.min(...values));
-  const max = Math.round(Math.max(...values));
-  if (min === max) {
-    const spread = Math.max(3000, Math.round(min * 0.15));
-    return {
-      Budget: { min: Math.max(1000, min - spread), max: min },
-      'Mid-Range': { min: min + 1, max: min + spread },
-      Premium: { min: min + spread + 1, max: min + spread * 2 },
-    };
-  }
-
-  const step = (max - min) / 3;
-  const budgetMax = Math.round(min + step);
-  const midMax = Math.round(min + step * 2);
-  return {
-    Budget: { min, max: budgetMax },
-    'Mid-Range': { min: budgetMax + 1, max: midMax },
-    Premium: { min: midMax + 1, max },
-  };
-}
-
-function artistRangeTagForValue(value, ranges) {
-  const v = Number(value);
-  if (!Number.isFinite(v)) return null;
-  if (v <= ranges.Budget.max) return 'Budget';
-  if (v <= ranges['Mid-Range'].max) return 'Mid-Range';
-  return 'Premium';
 }
 
 router.get('/all', async (req, res) => {
@@ -114,7 +60,6 @@ router.get('/all', async (req, res) => {
 
     const cityMap  = Object.fromEntries((cities ?? []).map(c => [c.slug, { mult: c.multiplier, label: c.label, region: c.region, id: c.id }]));
     const hotelMap = Object.fromEntries((hotelTiers ?? []).map(h => [h.slug, { label: h.label, roomRate: h.room_rate, costMult: h.cost_mult, decorMult: h.decor_mult, id: h.id }]));
-    const artistRanges = buildArtistPriceRanges(artists ?? []);
 
     const scrapedMapped = (scrapedDecor ?? [])
       .map(img => {
@@ -140,28 +85,7 @@ router.get('/all', async (req, res) => {
 
     res.json({
       cities: cityMap, hotelTiers: hotelMap,
-      artists: (artists ?? []).map(a => {
-        const meta = parseArtistNotes(a.notes);
-        const value = Number(a.price_inr ?? meta.price_inr ?? a.cost_min ?? a.cost_max);
-        const priceRangeTag = a.price_range_tag || meta.price_range_tag || artistRangeTagForValue(value, artistRanges);
-        const range = priceRangeTag ? artistRanges[priceRangeTag] : null;
-        return {
-          id: a.id,
-          slug: a.slug,
-          label: a.label,
-          type: a.artist_type,
-          isNamed: a.is_named,
-          imageUrl: a.image_url ?? meta.image_url ?? null,
-          profileUrl: a.profile_url ?? meta.profile_url ?? null,
-          priceInr: a.price_inr ?? (Number.isFinite(value) ? value : null),
-          costMin: a.cost_min,
-          costMax: a.cost_max,
-          priceRangeTag,
-          contributionMin: range?.min ?? null,
-          contributionMax: range?.max ?? null,
-        };
-      }),
-      artistRanges,
+      artists: (artists ?? []).map(a => ({ id: a.id, slug: a.slug, label: a.label, type: a.artist_type, isNamed: a.is_named, costMin: a.cost_min, costMax: a.cost_max })),
       meals: (meals ?? []).map(m => ({ id: m.id, slug: m.slug, label: m.label, costMinPH: m.cost_min_ph, costMaxPH: m.cost_max_ph })),
       barTiers: (barTiers ?? []).map(b => ({ id: b.id, slug: b.slug, label: b.label, costMinPH: b.cost_min_ph, costMaxPH: b.cost_max_ph })),
       specialtyCounters: (specialtyCounters ?? []).map(c => ({ id: c.id, slug: c.slug, label: c.label, costMin: c.cost_min, costMax: c.cost_max })),

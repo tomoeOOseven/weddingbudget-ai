@@ -1,8 +1,6 @@
 // routes/admin.js — cost data management with full audit trail
 const express = require('express');
 const router  = express.Router();
-const axios = require('axios');
-const crypto = require('crypto');
 const { requireAdmin, supabaseAdmin } = require('../middleware/authMiddleware');
 const { getHomepageContent, saveHomepageContent } = require('../lib/siteContentStore');
 
@@ -17,121 +15,6 @@ async function updateCostRow(table, id, updates, adminId) {
   const { data, error } = await supabaseAdmin.from(table)
     .update(payload).eq('id', id).select().single();
   return { data, error };
-}
-
-function buildArtistRanges(minValue, maxValue) {
-  const min = Math.round(Number(minValue));
-  const max = Math.round(Number(maxValue));
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) {
-    return {
-      Budget: { min: 10000, max: 30000 },
-      'Mid-Range': { min: 30001, max: 70000 },
-      Premium: { min: 70001, max: 150000 },
-    };
-  }
-  const step = (max - min) / 3;
-  const budgetMax = Math.round(min + step);
-  const midMax = Math.round(min + step * 2);
-  return {
-    Budget: { min, max: budgetMax },
-    'Mid-Range': { min: budgetMax + 1, max: midMax },
-    Premium: { min: midMax + 1, max },
-  };
-}
-
-function tagFromPrice(price, ranges) {
-  const p = Number(price);
-  if (!Number.isFinite(p)) return null;
-  if (p <= ranges.Budget.max) return 'Budget';
-  if (p <= ranges['Mid-Range'].max) return 'Mid-Range';
-  return 'Premium';
-}
-
-function parseArtistNotes(notes) {
-  const out = {};
-  String(notes || '').split('|').forEach((chunk) => {
-    const [k, ...rest] = chunk.split('=');
-    if (!k || rest.length === 0) return;
-    out[k.trim()] = rest.join('=').trim();
-  });
-  return out;
-}
-
-function normalizeArtistNotes(baseNotes, patch = {}) {
-  const meta = parseArtistNotes(baseNotes);
-  Object.entries(patch).forEach(([k, v]) => {
-    if (v === null || v === undefined || v === '') delete meta[k];
-    else meta[k] = String(v);
-  });
-  const plain = String(baseNotes || '')
-    .split('|')
-    .map((x) => x.trim())
-    .filter(Boolean)
-    .filter((chunk) => !chunk.includes('='));
-  const kv = Object.entries(meta).map(([k, v]) => `${k}=${v}`);
-  return [...plain, ...kv].join(' | ');
-}
-
-function extFromContentType(contentType) {
-  const t = String(contentType || '').toLowerCase();
-  if (t.includes('image/png')) return 'png';
-  if (t.includes('image/webp')) return 'webp';
-  if (t.includes('image/avif')) return 'avif';
-  if (t.includes('image/gif')) return 'gif';
-  return 'jpg';
-}
-
-async function resolveArtistImageUrl(imageUrl) {
-  const src = String(imageUrl || '').trim();
-  if (!src) return null;
-  if (!/^https?:\/\//i.test(src)) return src;
-
-  const response = await axios.get(src, {
-    responseType: 'arraybuffer',
-    timeout: 15000,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; WeddingBudgetAI/1.0)',
-      Accept: 'image/*',
-    },
-  });
-
-  const contentType = response.headers['content-type'] || 'image/jpeg';
-  if (!String(contentType).toLowerCase().startsWith('image/')) {
-    throw new Error('image_url did not return an image content type');
-  }
-
-  const ext = extFromContentType(contentType);
-  const random = crypto.randomBytes(8).toString('hex');
-  const ym = new Date().toISOString().slice(0, 7);
-  const storagePath = `artists/${ym}/${Date.now()}-${random}.${ext}`;
-
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from('decor-images')
-    .upload(storagePath, Buffer.from(response.data), {
-      contentType,
-      upsert: false,
-      cacheControl: '2592000',
-    });
-
-  if (uploadError) {
-    throw new Error(`failed to store artist image: ${uploadError.message}`);
-  }
-
-  return `${process.env.SUPABASE_URL}/storage/v1/object/public/decor-images/${storagePath}`;
-}
-
-async function getCurrentArtistRanges(incomingPrice = null) {
-  const { data: artists } = await supabaseAdmin
-    .from('artists')
-    .select('price_inr, cost_min')
-    .eq('is_active', true);
-
-  const values = (artists ?? [])
-    .map((a) => Number(a.price_inr ?? a.cost_min))
-    .filter((v) => Number.isFinite(v));
-  if (Number.isFinite(Number(incomingPrice))) values.push(Number(incomingPrice));
-  if (!values.length) return buildArtistRanges(10000, 150000);
-  return buildArtistRanges(Math.min(...values), Math.max(...values));
 }
 
 // ── CITIES ────────────────────────────────────────────────────────────────────
@@ -164,145 +47,20 @@ router.put('/hotels/:id', requireAdmin, async (req, res) => {
 router.get('/artists', requireAdmin, async (req, res) => {
   const { data, error } = await supabaseAdmin.from('artists').select('*').order('artist_type');
   if (error) return res.status(500).json({ error: error.message });
-  const artists = (data ?? []).map((a) => {
-    const meta = parseArtistNotes(a.notes);
-    return {
-      ...a,
-      price_inr: a.price_inr ?? (Number.isFinite(Number(meta.price_inr)) ? Number(meta.price_inr) : null),
-      price_range_tag: a.price_range_tag ?? meta.price_range_tag ?? null,
-      image_url: a.image_url ?? meta.image_url ?? null,
-      profile_url: a.profile_url ?? meta.profile_url ?? null,
-    };
-  });
-  res.json({ artists });
+  res.json({ artists: data });
 });
 
 router.post('/artists', requireAdmin, async (req, res) => {
-  const {
-    label,
-    artist_type,
-    price_inr,
-    image_url,
-    profile_url,
-    is_named = false,
-    notes,
-  } = req.body;
-  if (!label || !artist_type || !price_inr) {
-    return res.status(400).json({ error: 'label, artist_type, price_inr required.' });
-  }
-
-  const price = Math.round(Number(price_inr));
-  if (!Number.isFinite(price) || price < 1000) {
-    return res.status(400).json({ error: 'price_inr must be a valid number >= 1000.' });
-  }
-
-  let storedImageUrl = image_url ?? null;
-  if (image_url) {
-    try {
-      storedImageUrl = await resolveArtistImageUrl(image_url);
-    } catch (err) {
-      return res.status(400).json({ error: `Could not process image_url: ${err.message}` });
-    }
-  }
-
-  const ranges = await getCurrentArtistRanges(price);
-  const price_range_tag = tagFromPrice(price, ranges);
-  const range = ranges[price_range_tag];
-
+  const { label, artist_type, cost_min, cost_max, is_named = false, notes } = req.body;
+  if (!label || !artist_type || !cost_min || !cost_max) return res.status(400).json({ error: 'label, artist_type, cost_min, cost_max required.' });
   const slug = label.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 40) + '-' + Date.now().toString(36);
-  let { data, error } = await supabaseAdmin.from('artists').insert({
-    slug,
-    label,
-    artist_type,
-    price_inr: price,
-    price_range_tag,
-    cost_min: range.min,
-    cost_max: range.max,
-    image_url: storedImageUrl,
-    profile_url: profile_url ?? null,
-    is_named,
-    notes,
-    updated_by: req.profile.id,
-  }).select().single();
-
-  if (
-    error?.message?.toLowerCase().includes('column') &&
-    (error?.message?.toLowerCase().includes('does not exist') || error?.message?.toLowerCase().includes('could not find'))
-  ) {
-    const mergedNotes = normalizeArtistNotes(notes, {
-      price_inr: price,
-      price_range_tag,
-      image_url: storedImageUrl,
-      profile_url: profile_url ?? null,
-    });
-    ({ data, error } = await supabaseAdmin.from('artists').insert({
-      slug,
-      label,
-      artist_type,
-      cost_min: range.min,
-      cost_max: range.max,
-      is_named,
-      notes: mergedNotes,
-      updated_by: req.profile.id,
-    }).select().single());
-  }
-
+  const { data, error } = await supabaseAdmin.from('artists').insert({ slug, label, artist_type, cost_min, cost_max, is_named, notes, updated_by: req.profile.id }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json({ artist: data });
 });
 
 router.put('/artists/:id', requireAdmin, async (req, res) => {
-  const updates = { ...req.body };
-
-  if (updates.image_url != null) {
-    try {
-      updates.image_url = await resolveArtistImageUrl(updates.image_url);
-    } catch (err) {
-      return res.status(400).json({ error: `Could not process image_url: ${err.message}` });
-    }
-  }
-
-  if (updates.price_inr != null) {
-    const price = Math.round(Number(updates.price_inr));
-    if (!Number.isFinite(price) || price < 1000) {
-      return res.status(400).json({ error: 'price_inr must be a valid number >= 1000.' });
-    }
-    const ranges = await getCurrentArtistRanges(price);
-    const price_range_tag = tagFromPrice(price, ranges);
-    const range = ranges[price_range_tag];
-    updates.price_inr = price;
-    updates.price_range_tag = price_range_tag;
-    updates.cost_min = range.min;
-    updates.cost_max = range.max;
-  }
-
-  let { data, error } = await updateCostRow('artists', req.params.id, updates, req.profile.id);
-  if (
-    error?.message?.toLowerCase().includes('column') &&
-    (error?.message?.toLowerCase().includes('does not exist') || error?.message?.toLowerCase().includes('could not find'))
-  ) {
-    let existingNotes = updates.notes;
-    if (existingNotes == null) {
-      const { data: existing } = await supabaseAdmin
-        .from('artists')
-        .select('notes')
-        .eq('id', req.params.id)
-        .maybeSingle();
-      existingNotes = existing?.notes ?? '';
-    }
-    const fallbackUpdates = { ...updates };
-    fallbackUpdates.notes = normalizeArtistNotes(existingNotes, {
-      price_inr: updates.price_inr,
-      price_range_tag: updates.price_range_tag,
-      image_url: updates.image_url,
-      profile_url: updates.profile_url,
-    });
-    delete fallbackUpdates.price_inr;
-    delete fallbackUpdates.price_range_tag;
-    delete fallbackUpdates.image_url;
-    delete fallbackUpdates.profile_url;
-    ({ data, error } = await updateCostRow('artists', req.params.id, fallbackUpdates, req.profile.id));
-  }
+  const { data, error } = await updateCostRow('artists', req.params.id, req.body, req.profile.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ artist: data, message: 'Artist updated.' });
 });

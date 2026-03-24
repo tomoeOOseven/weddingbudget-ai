@@ -10,9 +10,7 @@ function createInitialInputs() {
   outstationPct: 60,
   functions:   new Set(['mehendi','sangeet','baraat','pheras','reception']),
   selectedDecors:    new Set(),
-  selectedDecorMeta: {},
   selectedArtists:   new Set(),
-  selectedArtistMeta: {},
   selectedMeals:     new Set(['welcome','gala']),
   barTier:           'wine',
   specialtyCounters: new Set(['chaat','mocktail']),
@@ -34,70 +32,9 @@ function ensureSet(value, fallbackSet) {
   return new Set(fallbackSet);
 }
 
-function buildArtistPriceRanges(artists) {
-  const values = (artists ?? [])
-    .map((a) => Number(a.priceInr ?? a.costMin ?? a.costMax))
-    .filter((v) => Number.isFinite(v));
-  if (!values.length) {
-    return {
-      Budget: { min: 10000, max: 30000 },
-      'Mid-Range': { min: 30001, max: 70000 },
-      Premium: { min: 70001, max: 150000 },
-    };
-  }
-
-  const min = Math.round(Math.min(...values));
-  const max = Math.round(Math.max(...values));
-  if (min === max) {
-    const spread = Math.max(3000, Math.round(min * 0.15));
-    return {
-      Budget: { min: Math.max(1000, min - spread), max: min },
-      'Mid-Range': { min: min + 1, max: min + spread },
-      Premium: { min: min + spread + 1, max: min + spread * 2 },
-    };
-  }
-
-  const step = (max - min) / 3;
-  const budgetMax = Math.round(min + step);
-  const midMax = Math.round(min + step * 2);
-  return {
-    Budget: { min, max: budgetMax },
-    'Mid-Range': { min: budgetMax + 1, max: midMax },
-    Premium: { min: midMax + 1, max },
-  };
-}
-
-function artistTagFromValue(value, ranges) {
-  const v = Number(value);
-  if (!Number.isFinite(v)) return null;
-  if (v <= ranges.Budget.max) return 'Budget';
-  if (v <= ranges['Mid-Range'].max) return 'Mid-Range';
-  return 'Premium';
-}
-
-function decorBoundsFromTag(tag) {
-  if (tag === 'Budget') return { min: 1000, max: 15000 };
-  if (tag === 'Mid-Range') return { min: 15001, max: 80000 };
-  if (tag === 'Premium') return { min: 80001, max: 500000 };
-  return null;
-}
-
 export function serializeBudgetInputs(inputs) {
   return {
-    city: inputs.city,
-    hotelTier: inputs.hotelTier,
-    rooms: inputs.rooms,
-    guests: inputs.guests,
-    outstationPct: inputs.outstationPct,
-    barTier: inputs.barTier,
-    transfers: inputs.transfers,
-    ghodi: inputs.ghodi,
-    dholis: inputs.dholis,
-    roomBaskets: inputs.roomBaskets,
-    rituals: inputs.rituals,
-    gifts: inputs.gifts,
-    stationery: inputs.stationery,
-    photography: inputs.photography,
+    ...inputs,
     functions: [...inputs.functions],
     selectedDecors: [...inputs.selectedDecors],
     selectedArtists: [...inputs.selectedArtists],
@@ -123,9 +60,7 @@ export function normalizeBudgetInputs(raw = {}) {
     outstationPct: Number.isFinite(Number(raw.outstationPct)) ? Number(raw.outstationPct) : initial.outstationPct,
     functions: ensureSet(raw.functions, initial.functions),
     selectedDecors: ensureSet(raw.selectedDecors, initial.selectedDecors),
-    selectedDecorMeta: {},
     selectedArtists: ensureSet(raw.selectedArtists, initial.selectedArtists),
-    selectedArtistMeta: {},
     selectedMeals: ensureSet(raw.selectedMeals, initial.selectedMeals),
     barTier: raw.barTier ?? initial.barTier,
     specialtyCounters: ensureSet(raw.specialtyCounters, initial.specialtyCounters),
@@ -146,26 +81,10 @@ export function useBudget(refData) {
   const [step, setStep]     = useState(1);
 
   const set    = useCallback((key, val) => setInputs(p => ({ ...p, [key]: val })), []);
-  const toggle = useCallback((key, id, meta = null) => setInputs((p) => {
+  const toggle = useCallback((key, id) => setInputs(p => {
     const s = new Set(p[key]);
-    const had = s.has(id);
-    if (had) s.delete(id);
-    else s.add(id);
-
-    const next = { ...p, [key]: s };
-    if (key === 'selectedArtists' && meta) {
-      const map = { ...(p.selectedArtistMeta ?? {}) };
-      if (had) delete map[id];
-      else map[id] = meta;
-      next.selectedArtistMeta = map;
-    }
-    if (key === 'selectedDecors' && meta) {
-      const map = { ...(p.selectedDecorMeta ?? {}) };
-      if (had) delete map[id];
-      else map[id] = meta;
-      next.selectedDecorMeta = map;
-    }
-    return next;
+    s.has(id) ? s.delete(id) : s.add(id);
+    return { ...p, [key]: s };
   }), []);
   const hydrateInputs = useCallback((nextInputs) => setInputs(normalizeBudgetInputs(nextInputs)), []);
   const resetInputs = useCallback(() => setInputs(createInitialInputs()), []);
@@ -183,7 +102,6 @@ export function useBudget(refData) {
     const BARS    = refData?.barTiers          ?? [];
     const CTRS    = refData?.specialtyCounters ?? [];
     const ARTISTS = refData?.artists           ?? [];
-    const ARTIST_RANGES = refData?.artistRanges ?? buildArtistPriceRanges(ARTISTS);
     const DECORS  = refData?.decor             ?? [];
     // ── fixed field names: logistics (not logisticsRates), sfxItems (not sfx) ─
     const LR      = refData?.logistics         ?? {};
@@ -201,48 +119,21 @@ export function useBudget(refData) {
     });
 
     // 2. Décor & Design
-    const baseDecorMinPerFn = 200000 * (hd.decorMult ?? 1) * cm;
-    const baseDecorMaxPerFn = 500000 * (hd.decorMult ?? 1) * cm;
-
     if (inputs.selectedDecors.size > 0) {
-      let selectedCount = 0;
       [...inputs.selectedDecors].forEach(dId => {
-        const d = DECORS.find(x => x.id === dId) || inputs.selectedDecorMeta?.[dId];
-        if (d) {
-          selectedCount += 1;
-          const range = decorBoundsFromTag(d.priceRangeTag);
-          if (range) {
-            items.push({
-              cat: 'Décor & Design',
-              sub: `${d.label} (${d.priceRangeTag})`,
-              min: range.min * (hd.decorMult ?? 1) * cm,
-              max: range.max * (hd.decorMult ?? 1) * cm,
-            });
-          } else {
-            items.push({
-              cat: 'Décor & Design', sub: d.label,
-              min: (Number(d.costMin ?? d.cost_seed_min) || 0) * (hd.decorMult ?? 1) * cm * 0.9,
-              max: (Number(d.costMax ?? d.cost_seed_max ?? d.costMin ?? d.cost_seed_min) || 0) * (hd.decorMult ?? 1) * cm * 1.1,
-            });
-          }
-        }
-      });
-
-      const remainingFunctions = Math.max(0, nFn - selectedCount);
-      if (remainingFunctions > 0) {
-        items.push({
-          cat: 'Décor & Design',
-          sub: `${remainingFunctions} function${remainingFunctions > 1 ? 's' : ''} - baseline`,
-          min: baseDecorMinPerFn * remainingFunctions,
-          max: baseDecorMaxPerFn * remainingFunctions,
+        const d = DECORS.find(x => x.id === dId);
+        if (d) items.push({
+          cat: 'Décor & Design', sub: d.label,
+          min: (d.costMin ?? 0) * (hd.decorMult ?? 1) * cm * 0.9,
+          max: (d.costMax ?? 0) * (hd.decorMult ?? 1) * cm * 1.1,
         });
-      }
+      });
     } else {
       items.push({
         cat: 'Décor & Design',
-        sub: `${nFn} functions - baseline`,
-        min: baseDecorMinPerFn * nFn,
-        max: baseDecorMaxPerFn * nFn,
+        sub: `${nFn} functions — default estimate`,
+        min: 200000 * (hd.decorMult ?? 1) * cm * nFn,
+        max: 500000 * (hd.decorMult ?? 1) * cm * nFn,
       });
     }
 
@@ -266,21 +157,10 @@ export function useBudget(refData) {
     if (inputs.selectedArtists.size > 0) {
       let aMin = 0, aMax = 0;
       [...inputs.selectedArtists].forEach(aId => {
-        const a = ARTISTS.find(x => x.id === aId || x.slug === aId) || inputs.selectedArtistMeta?.[aId];
-        if (a) {
-          const baseValue = Number(a.priceInr ?? a.costMin ?? a.costMax);
-          const tag = a.priceRangeTag || artistTagFromValue(baseValue, ARTIST_RANGES);
-          const bucket = tag ? ARTIST_RANGES[tag] : null;
-          if (bucket) {
-            aMin += bucket.min;
-            aMax += bucket.max;
-          } else {
-            aMin += Number(a.costMin) || 0;
-            aMax += Number(a.costMax) || Number(a.costMin) || 0;
-          }
-        }
+        const a = ARTISTS.find(x => x.id === aId || x.slug === aId);
+        if (a) { aMin += a.costMin; aMax += a.costMax; }
       });
-      items.push({ cat:'Artists & Entertainment', sub:`${inputs.selectedArtists.size} acts`, min:aMin, max:aMax });
+      items.push({ cat:'Artists & Entertainment', sub:`${inputs.selectedArtists.size} acts`, min:aMin * 0.95, max:aMax * 1.05 });
     }
 
     // 5. Logistics  ← fixed: uses LR.ghodiMin/ghodiMax/dholiUnitMin/dholiUnitMax

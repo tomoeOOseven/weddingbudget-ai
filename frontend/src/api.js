@@ -31,7 +31,7 @@ export const quickEstimate       = (inputs) => request('/api/estimate/quick', { 
 export const fetchDecor          = (p = {}) => request(`/api/decor?${new URLSearchParams(p)}`);
 export const fetchScrapedDecor   = (p = {}) => request(`/api/decor/scraped?${new URLSearchParams(p)}`);
 export const scoreDecor          = (selections, city, hotelTier) => request('/api/decor/score', { method:'POST', body: JSON.stringify({ selections, city, hotelTier }) });
-export const fetchArtists        = (p = {}) => request(`/api/artists?${new URLSearchParams(p)}`);
+export const fetchArtists        = (type) => request(`/api/artists${type ? `?type=${type}` : ''}`);
 export const estimateFB          = (payload) => request('/api/fb/estimate', { method:'POST', body: JSON.stringify(payload) });
 export const estimateLogistics   = (payload) => request('/api/logistics/estimate', { method:'POST', body: JSON.stringify(payload) });
 export const fetchWeddings       = () => request('/api/weddings');
