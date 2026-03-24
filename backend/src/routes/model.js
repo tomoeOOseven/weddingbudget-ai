@@ -50,6 +50,11 @@ function parsePercentOrRatio(raw) {
   return Math.max(0, Math.min(1, n));
 }
 
+function isMissingSchemaColumnError(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('schema cache') && msg.includes('could not find') && msg.includes('column');
+}
+
 function parseMetricsFromMessage(message) {
   const text = String(message || '');
   const capture = (pattern) => text.match(pattern)?.[1] ?? null;
@@ -59,6 +64,58 @@ function parseMetricsFromMessage(message) {
     precision: parsePercentOrRatio(capture(/\bprecision\b\s*[:=]\s*([0-9]+(?:\.[0-9]+)?%?)/i)),
     recall: parsePercentOrRatio(capture(/\brecall\b\s*[:=]\s*([0-9]+(?:\.[0-9]+)?%?)/i)),
     f1_score: parsePercentOrRatio(capture(/\bf1\b\s*[:=]\s*([0-9]+(?:\.[0-9]+)?%?)/i)),
+  };
+}
+
+function toFiniteRatio(raw) {
+  const parsed = parsePercentOrRatio(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sumSupport(support) {
+  if (support == null) return null;
+  if (Number.isFinite(Number(support))) return Number(support);
+  if (typeof support === 'object') {
+    const vals = Object.values(support).map((v) => Number(v)).filter((n) => Number.isFinite(n));
+    if (!vals.length) return null;
+    return vals.reduce((s, n) => s + n, 0);
+  }
+  return null;
+}
+
+async function downloadMetricsSidecar(versionTag) {
+  const path = `versions/${versionTag}/metrics.json`;
+  const { data, error } = await supabaseAdmin.storage.from(MODEL_BUCKET).download(path);
+  if (error || !data) return null;
+
+  try {
+    // Supabase returns Blob in Node fetch runtimes.
+    const text = typeof data.text === 'function'
+      ? await data.text()
+      : Buffer.from(await data.arrayBuffer()).toString('utf8');
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeMetrics(sidecarMetrics = null, fallbackMetrics = {}) {
+  const metrics = sidecarMetrics || {};
+  const accuracy = toFiniteRatio(metrics.accuracy ?? fallbackMetrics.accuracy);
+  const precision = toFiniteRatio(metrics.precision ?? fallbackMetrics.precision);
+  const recall = toFiniteRatio(metrics.recall ?? fallbackMetrics.recall);
+  const f1Score = toFiniteRatio(metrics.f1 ?? metrics.f1_score ?? fallbackMetrics.f1_score);
+  const support = metrics.support ?? null;
+
+  return {
+    accuracy,
+    precision,
+    recall,
+    f1_score: f1Score,
+    support,
+    test_set_size: sumSupport(support),
   };
 }
 
@@ -93,6 +150,8 @@ async function upsertModelVersionFromStorage({ metrics = {}, trainedBy = null, n
 
   const modelPath = `versions/${versionTag}/model.joblib`;
   const trainedAt = parseVersionTagToIsoUtc(versionTag);
+  const sidecarMetrics = await downloadMetricsSidecar(versionTag);
+  const normalizedMetrics = normalizeMetrics(sidecarMetrics, metrics);
 
   // Ensure the folder has the core artifacts before writing DB state.
   const { data: artifacts, error: listErr } = await supabaseAdmin.storage
@@ -112,32 +171,63 @@ async function upsertModelVersionFromStorage({ metrics = {}, trainedBy = null, n
     .maybeSingle();
   if (existingErr) throw new Error(existingErr.message);
 
+  const metricsBlob = {
+    accuracy: normalizedMetrics.accuracy,
+    precision: normalizedMetrics.precision,
+    recall: normalizedMetrics.recall,
+    f1: normalizedMetrics.f1_score,
+    support: normalizedMetrics.support,
+    version_tag: versionTag,
+    created_at: trainedAt,
+  };
+
   const payload = {
     version_label: versionTag,
     status: 'ready',
     model_file_path: modelPath,
     trained_at: trainedAt,
-    notes: notes || null,
+    notes: notes || `metrics_sidecar=${JSON.stringify(metricsBlob)}`,
   };
 
   if (trainedBy) payload.trained_by = trainedBy;
-  if (metrics.accuracy != null) payload.accuracy = metrics.accuracy;
-  if (metrics.precision != null) payload.precision = metrics.precision;
-  if (metrics.recall != null) payload.recall = metrics.recall;
-  if (metrics.f1_score != null) payload.f1_score = metrics.f1_score;
+  if (normalizedMetrics.accuracy != null) payload.accuracy = normalizedMetrics.accuracy;
+  if (normalizedMetrics.precision != null) payload.precision = normalizedMetrics.precision;
+  if (normalizedMetrics.recall != null) payload.recall = normalizedMetrics.recall;
+  if (normalizedMetrics.f1_score != null) payload.f1_score = normalizedMetrics.f1_score;
+  if (normalizedMetrics.test_set_size != null) payload.test_set_size = normalizedMetrics.test_set_size;
 
-  if (existing?.id) {
-    const { error: updateErr } = await supabaseAdmin
-      .from('model_versions')
-      .update(payload)
-      .eq('id', existing.id);
-    if (updateErr) throw new Error(updateErr.message);
-  } else {
+  async function writePayload(writePayloadData) {
+    if (existing?.id) {
+      const { error: updateErr } = await supabaseAdmin
+        .from('model_versions')
+        .update(writePayloadData)
+        .eq('id', existing.id);
+      if (updateErr) return { ok: false, error: updateErr };
+      return { ok: true };
+    }
+
     const { error: insertErr } = await supabaseAdmin
       .from('model_versions')
-      .insert(payload);
-    if (insertErr) throw new Error(insertErr.message);
+      .insert(writePayloadData);
+    if (insertErr) return { ok: false, error: insertErr };
+    return { ok: true };
   }
+
+  let writeResult = await writePayload(payload);
+  if (!writeResult.ok && isMissingSchemaColumnError(writeResult.error)) {
+    const fallbackPayload = {
+      version_label: versionTag,
+      status: 'ready',
+      model_file_path: modelPath,
+      trained_at: trainedAt,
+      notes: notes || `metrics_sidecar=${JSON.stringify(metricsBlob)}`,
+    };
+    if (trainedBy) fallbackPayload.trained_by = trainedBy;
+
+    writeResult = await writePayload(fallbackPayload);
+  }
+
+  if (!writeResult.ok) throw new Error(writeResult.error.message);
 
   // Make this version active (single-active invariant).
   const { error: deactivateErr } = await supabaseAdmin
