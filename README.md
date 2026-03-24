@@ -9,7 +9,7 @@ Built for the WedTech Innovation Challenge by Events by Athea.
 weddingbudget-ai/
 ├── frontend/     React + Vite
 ├── backend/      Node.js + Express
-├── ml_service/   Python + FastAPI + CLIP + GBM
+├── ml_service/   Python notebooks and experiments
 └── database/     Supabase schema + migrations
 ```
 
@@ -20,7 +20,7 @@ weddingbudget-ai/
 - Enable `vector` extension (Database → Extensions)
 - Run `database/schema.sql` in SQL Editor
 - Create Storage buckets: `decor-images` (public), `ml-models` (private)
-- Invite admin user, run `database/migrations/001_promote_admin.sql`
+- Invite admin user, run `database/migrations/promote_pramukto.sql`
 
 ### 2. Backend
 ```bash
@@ -34,13 +34,9 @@ cd frontend && cp .env.example .env  # fill in Supabase + API URL
 npm install && npm run dev            # http://localhost:5173
 ```
 
-### 4. ML Service (optional, improves decor cost accuracy)
-```bash
-cd ml_service && cp .env.example .env
-pip install -r requirements.txt
-# For CLIP: pip install torch torchvision && pip install git+https://github.com/openai/CLIP.git
-uvicorn main:app --port 8000 --reload
-```
+### 4. ML Notebooks (optional)
+- `ml_service/` currently stores notebooks/experiments.
+- If you add a runnable ML API service later, document the launch command here.
 
 ## Routes
 - `/` — Client budget wizard
@@ -53,6 +49,9 @@ uvicorn main:app --port 8000 --reload
 2. `/admin/labelling` → tag images (manual or AI auto-tag via OpenRouter)
 3. `/admin/model` → trigger ML training run
 4. Client picks decor → ML service predicts cost range live
+
+## Artist Data Note
+- Client artist step uses seeded tier rows from `public.artists` where `is_named = false`.
 
 ## All 12 Modules
 Smart Input Wizard · Décor Library (AI) · Logistics Engine · Artist Cost Mapper ·
