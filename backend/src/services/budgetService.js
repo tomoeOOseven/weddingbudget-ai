@@ -9,6 +9,51 @@ function requireFiniteNumber(value, field) {
   return n;
 }
 
+function buildThreePriceRanges(minValue, maxValue) {
+  const min = Math.round(Number(minValue));
+  const max = Math.round(Number(maxValue));
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) {
+    return {
+      Budget: { min: 10000, max: 30000 },
+      'Mid-Range': { min: 30001, max: 70000 },
+      Premium: { min: 70001, max: 150000 },
+    };
+  }
+
+  if (min === max) {
+    const spread = Math.max(3000, Math.round(min * 0.15));
+    return {
+      Budget: { min: Math.max(1000, min - spread), max: min },
+      'Mid-Range': { min: min + 1, max: min + spread },
+      Premium: { min: min + spread + 1, max: min + spread * 2 },
+    };
+  }
+
+  const width = (max - min) / 3;
+  const budgetMax = Math.round(min + width);
+  const midMax = Math.round(min + width * 2);
+  return {
+    Budget: { min, max: budgetMax },
+    'Mid-Range': { min: budgetMax + 1, max: midMax },
+    Premium: { min: midMax + 1, max },
+  };
+}
+
+function artistTagFromValue(value, ranges) {
+  const v = Number(value);
+  if (!Number.isFinite(v)) return null;
+  if (v <= ranges.Budget.max) return 'Budget';
+  if (v <= ranges['Mid-Range'].max) return 'Mid-Range';
+  return 'Premium';
+}
+
+function decorBoundsFromTag(tag) {
+  if (tag === 'Budget') return { min: 1000, max: 15000 };
+  if (tag === 'Mid-Range') return { min: 15001, max: 80000 };
+  if (tag === 'Premium') return { min: 80001, max: 500000 };
+  return null;
+}
+
 function calculateBudget(inputs, refData) {
   const {
     city, hotelTier, rooms, guests, outstationPct, functions,
@@ -73,11 +118,22 @@ function calculateBudget(inputs, refData) {
     const arrDecors = Array.isArray(selectedDecors) ? selectedDecors : [...selectedDecors];
     arrDecors.forEach(dId => {
       const d = decorList.find(x => x.id === dId);
-      if (d) items.push({
-        cat: 'Décor & Design', sub: d.label,
-        min: (d.costMin ?? 0) * (hd.decorMult ?? 1) * cm * 0.9,
-        max: (d.costMax ?? 0) * (hd.decorMult ?? 1) * cm * 1.1,
-      });
+      if (d) {
+        const range = decorBoundsFromTag(d.priceRangeTag);
+        if (range) {
+          items.push({
+            cat: 'Décor & Design', sub: `${d.label} (${d.priceRangeTag})`,
+            min: range.min * (hd.decorMult ?? 1) * cm,
+            max: range.max * (hd.decorMult ?? 1) * cm,
+          });
+        } else {
+          items.push({
+            cat: 'Décor & Design', sub: d.label,
+            min: (d.costMin ?? 0) * (hd.decorMult ?? 1) * cm * 0.9,
+            max: (d.costMax ?? 0) * (hd.decorMult ?? 1) * cm * 1.1,
+          });
+        }
+      }
     });
   } else {
     items.push({ cat: 'Décor & Design', sub: `${nFn} functions — default estimate`,
@@ -112,12 +168,30 @@ function calculateBudget(inputs, refData) {
   const artistList = refData.artists ?? [];
   const arrArtists = Array.isArray(selectedArtists) ? selectedArtists : [...selectedArtists];
   if (arrArtists.length > 0) {
+    const artistValues = artistList
+      .map((a) => Number(a.costMin ?? a.costMax))
+      .filter((v) => Number.isFinite(v));
+    const artistRanges = refData.artistRanges ?? buildThreePriceRanges(
+      Math.min(...artistValues),
+      Math.max(...artistValues)
+    );
     let aMin = 0, aMax = 0;
     arrArtists.forEach(aId => {
       const a = artistList.find(x => x.id === aId || x.slug === aId);
-      if (a) { aMin += a.costMin; aMax += a.costMax; }
+      if (a) {
+        const baseValue = Number(a.costMin ?? a.costMax);
+        const tag = a.priceRangeTag || artistTagFromValue(baseValue, artistRanges);
+        const bucket = artistRanges[tag] || null;
+        if (bucket) {
+          aMin += bucket.min;
+          aMax += bucket.max;
+        } else {
+          aMin += Number(a.costMin) || 0;
+          aMax += Number(a.costMax) || Number(a.costMin) || 0;
+        }
+      }
     });
-    items.push({ cat: 'Artists & Entertainment', sub: `${arrArtists.length} acts`, min: aMin * 0.95, max: aMax * 1.05 });
+    items.push({ cat: 'Artists & Entertainment', sub: `${arrArtists.length} acts`, min: aMin, max: aMax });
   }
 
   // 5. Logistics

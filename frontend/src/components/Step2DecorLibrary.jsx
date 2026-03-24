@@ -1,13 +1,23 @@
 // Step2DecorLibrary.jsx — real images from DB + ML cost prediction
-import React, { useState, useEffect } from 'react';
-import { Card, Label, SubText, FilterPills, fmt } from './ui.jsx';
-import { scoreDecor } from '../api.js';
-import { FiActivity, FiCheck, FiImage } from 'react-icons/fi';
+import React, { useState } from 'react';
+import { Card, FilterPills, fmt } from './ui.jsx';
+import { FiCheck, FiImage } from 'react-icons/fi';
+
+function decorBoundsFromTag(tag) {
+  if (tag === 'Budget') return { min: 1000, max: 15000 };
+  if (tag === 'Mid-Range') return { min: 15001, max: 80000 };
+  if (tag === 'Premium') return { min: 80001, max: 500000 };
+  return { min: 0, max: 0 };
+}
+
+function rangePillColor(tag) {
+  if (tag === 'Budget') return { bg: '#E8F8EE', fg: '#166534' };
+  if (tag === 'Mid-Range') return { bg: '#FFF4DE', fg: '#9A5B00' };
+  return { bg: '#FDE8E8', fg: '#991B1B' };
+}
 
 export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
   const [priceFilter, setPriceFilter] = useState('All');
-  const [mlScores, setMlScores]       = useState({});
-  const [scoring, setScoring]         = useState(false);
 
   const decors  = refData?.decor ?? [];
   const scrapedCount = decors.filter((d) => d.source === 'scraped').length;
@@ -45,43 +55,13 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
     return priceOk;
   });
 
-  // Stable key: sorted IDs joined — changes whenever any item is added, removed, or swapped
-  const selectedKey = [...inputs.selectedDecors].sort().join(',');
-
-  // ML-score selections on change
-  useEffect(() => {
-    const selected = [...inputs.selectedDecors];
-    if (!selected.length) return;
-    const unscored = selected.filter(id => !mlScores[id]);
-    if (!unscored.length) return;
-
-    setScoring(true);
-    const selections = unscored.map(id => {
-      const d = decors.find(x => x.id === id);
-      return d ? { decorId: id, label: d.label, function: d.function, style: d.style, complexity: d.complexity, costMin: d.costMin, costMax: d.costMax } : null;
-    }).filter(Boolean);
-
-    scoreDecor(selections, inputs.city, inputs.hotelTier)
-      .then(data => {
-        const scores = {};
-        (data.scored ?? []).forEach(s => { scores[s.decorId] = s; });
-        setMlScores(prev => ({ ...prev, ...scores }));
-      })
-      .catch(() => {})
-      .finally(() => setScoring(false));
-  }, [selectedKey, inputs.city, inputs.hotelTier]);
-
   function getCostRange(d) {
-    const ml = mlScores[d.id];
-    if (ml) return { min: ml.cost_min, max: ml.cost_max, isML: true, confidence: ml.confidence };
+    const base = decorBoundsFromTag(d.priceRangeTag);
     return {
-      min: Math.round((d.costMin ?? 0) * (hd?.decorMult ?? 1) * cm * 0.9),
-      max: Math.round((d.costMax ?? 0) * (hd?.decorMult ?? 1) * cm * 1.1),
-      isML: false, confidence: null,
+      min: Math.round(base.min * (hd?.decorMult ?? 1) * cm),
+      max: Math.round(base.max * (hd?.decorMult ?? 1) * cm),
     };
   }
-
-  const COMPLEXITY_COLOR = { low:'#16a34a', medium:'#d97706', high:'#dc2626', ultra:'#7c3aed' };
 
   return (
     <div>
@@ -101,7 +81,9 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(175px,1fr))', gap:12 }}>
         {visible.map(d => {
           const on = inputs.selectedDecors.has(d.id);
-          const { min, max, isML, confidence } = getCostRange(d);
+          const { min, max } = getCostRange(d);
+          const tag = d.priceRangeTag || 'Premium';
+          const pill = rangePillColor(tag);
           return (
             <div key={d.id} onClick={() => toggle('selectedDecors', d.id)} style={{
               borderRadius:10, cursor:'pointer', overflow:'hidden',
@@ -123,17 +105,8 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
               <div style={{ padding:'10px 12px' }}>
                 <div style={{ fontWeight:600, fontSize:12, marginBottom:4, lineHeight:1.3 }}>{d.label}</div>
                 <div style={{ display:'flex', gap:4, marginBottom:6, flexWrap:'wrap' }}>
-                  <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, fontWeight:600, background:'#EEE8E0', color:'#5A4035' }}>{d.style}</span>
-                  {d.complexity && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, fontWeight:700, background:`${COMPLEXITY_COLOR[d.complexity]}18`, color:COMPLEXITY_COLOR[d.complexity] }}>{d.complexity}</span>}
-                  {d.priceRangeTag && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, fontWeight:700, background:'#fef3c7', color:'#92400e' }}>{d.priceRangeTag}</span>}
-                  {d.source === 'scraped' && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, background:'#e0f2fe', color:'#0369a1' }}>AI tagged</span>}
+                  <span style={{ padding:'2px 8px', borderRadius:999, fontSize:9, fontWeight:700, background:pill.bg, color:pill.fg }}>{tag}</span>
                 </div>
-                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:13, fontWeight:600, color: on ? 'var(--maroon)' : 'var(--muted)' }}>
-                  {fmt(min)} – {fmt(max)}
-                </div>
-                {isML && confidence && (
-                  <div style={{ fontSize:9, color:'#15803d', marginTop:2 }}><FiActivity style={{ verticalAlign:'middle' }} /> ML · {Math.round(confidence*100)}% conf.</div>
-                )}
               </div>
 
               {on && <div style={{ position:'absolute', top:8, right:8, background:'var(--gold)', color:'#fff', borderRadius:'50%', width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}><FiCheck /></div>}
@@ -152,15 +125,14 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
         <Card style={{ background:'#FBF0DC', border:'1px solid var(--gold)', marginTop:16 }}>
           <div style={{ fontWeight:600, fontSize:13, color:'var(--maroon)', marginBottom:10 }}>
             {inputs.selectedDecors.size} design{inputs.selectedDecors.size > 1 ? 's' : ''} selected
-            {scoring && <span style={{ fontSize:11, color:'var(--muted)', marginLeft:8 }}><FiActivity style={{ verticalAlign:'middle' }} /> Getting ML estimates...</span>}
           </div>
           {[...inputs.selectedDecors].map(dId => {
             const d = decors.find(x => x.id === dId);
             if (!d) return null;
-            const { min, max, isML } = getCostRange(d);
+            const { min, max } = getCostRange(d);
             return (
               <div key={dId} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
-                <span>{d.label} {isML && <span style={{ fontSize:10, color:'#15803d' }}><FiActivity style={{ verticalAlign:'middle' }} /></span>}</span>
+                <span>{d.label} · {d.priceRangeTag || 'Premium'}</span>
                 <span style={{ color:'var(--maroon)', fontWeight:600 }}>{fmt(min)} – {fmt(max)}</span>
               </div>
             );

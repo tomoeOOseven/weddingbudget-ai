@@ -186,7 +186,7 @@ export default function AdminInference() {
       {loading ? (
         <div style={{ color: '#999', fontSize: 13 }}>Loading scraped images...</div>
       ) : (
-        <div style={{ maxWidth: 860 }}>
+        <div style={{ maxWidth: 460 }}>
           <div style={{ background: '#fff', border: '1px solid #eee4d8', borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Select Scraped Image</div>
             <select
@@ -214,11 +214,11 @@ export default function AdminInference() {
               ))}
             </select>
 
-            <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: '#f5f0eb' }}>
+            <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: '#f5f0eb', width: '100%', aspectRatio: '1 / 1' }}>
               {selected?.imageUrl ? (
-                <img src={selected.imageUrl} alt={selected.title} style={{ width: '100%', maxHeight: 380, objectFit: 'contain', display: 'block', background: '#f5f0eb' }} />
+                <img src={selected.imageUrl} alt={selected.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', background: '#f5f0eb' }} />
               ) : (
-                <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
                   <FiImage size={28} />
                 </div>
               )}
