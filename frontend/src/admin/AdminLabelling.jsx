@@ -91,8 +91,7 @@ function LabelForm({ initial = {}, onSubmit, submitting, submitLabel = 'Save Lab
   });
 
   const set   = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const valid = form.function_type && form.style && form.complexity &&
-    form.price_estimate !== '';
+  const valid = form.price_estimate !== '';
 
   const S = {
     row:   { display:'flex', gap:12, marginBottom:14 },

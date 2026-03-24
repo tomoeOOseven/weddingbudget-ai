@@ -41,9 +41,8 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
   const priceTabs = ['All', 'Budget', 'Mid-Range', 'Premium'];
 
   const visible = decors.filter(d => {
-    const fnOk    = !inputs.functions.size || inputs.functions.has(d.function);
     const priceOk = priceFilter === 'All' || d.priceRangeTag === priceFilter;
-    return fnOk && priceOk;
+    return priceOk;
   });
 
   // Stable key: sorted IDs joined — changes whenever any item is added, removed, or swapped
@@ -143,7 +142,7 @@ export default function Step2DecorLibrary({ inputs, toggle, refData, cm, hd }) {
         })}
         {visible.length === 0 && (
           <div style={{ gridColumn:'1/-1', textAlign:'center', padding:'40px 20px', color:'var(--muted)' }}>
-            Select functions in Step 1 to see matching décor styles.
+            No décor styles found for the selected price filter.
           </div>
         )}
       </div>

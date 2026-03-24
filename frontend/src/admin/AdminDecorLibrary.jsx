@@ -56,8 +56,33 @@ function ImageCard({ item }) {
         <div style={{ fontSize: 12, fontWeight: 600, color: '#1f1f1f', lineHeight: 1.3, minHeight: 31 }}>
           {item.label || 'Decor Item'}
         </div>
-        <div style={{ marginTop: 6, fontSize: 11, color: '#666' }}>
-          {item.function || item.function_type || 'other'} | {item.style || 'Traditional'}
+        <div style={{ marginTop: 6 }}>
+          {item.priceRangeTag && (
+            <span
+              style={{
+                display: 'inline-block',
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background:
+                  item.priceRangeTag === 'Budget' ? '#dcfce7'
+                    : item.priceRangeTag === 'Mid-Range' ? '#fef3c7'
+                      : '#fee2e2',
+                color:
+                  item.priceRangeTag === 'Budget' ? '#166534'
+                    : item.priceRangeTag === 'Mid-Range' ? '#92400e'
+                      : '#991b1b',
+              }}
+            >
+              {item.priceRangeTag}
+            </span>
+          )}
+          {!item.priceRangeTag && (
+            <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: '#f3f4f6', color: '#6b7280' }}>
+              Unclassified
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -67,7 +92,6 @@ function ImageCard({ item }) {
 export default function AdminDecorLibrary() {
   const [loading, setLoading] = useState(true);
   const [scraped, setScraped] = useState([]);
-  const [query, setQuery] = useState('');
   const [priceFilter, setPriceFilter] = useState('All');
   const [error, setError] = useState('');
 
@@ -104,15 +128,10 @@ export default function AdminDecorLibrary() {
 
   const visible = useMemo(
     () => scraped.filter((item) => {
-      const q = query.trim().toLowerCase();
       const priceOk = priceFilter === 'All' || String(item.priceRangeTag || '') === priceFilter;
-      if (!priceOk) return false;
-      if (!q) return true;
-      return [item.label, item.function, item.style, item.status, item.priceRangeTag]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q));
+      return priceOk;
     }),
-    [scraped, query, priceFilter],
+    [scraped, priceFilter],
   );
 
   const S = {
@@ -154,19 +173,6 @@ export default function AdminDecorLibrary() {
             {filter}
           </button>
         ))}
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search title / function / style / status / price tag"
-          style={{
-            minWidth: 260,
-            padding: '8px 10px',
-            border: '1px solid #e0d5c5',
-            borderRadius: 8,
-            fontSize: 12,
-            fontFamily: "'Jost',sans-serif",
-          }}
-        />
       </div>
 
       {error && <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 10 }}>{error}</div>}
