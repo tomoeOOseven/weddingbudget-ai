@@ -61,44 +61,20 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function parseSseEvents(rawText) {
-  const lines = String(rawText || '').split(/\r?\n/);
-  const events = [];
-  let currentEvent = '';
-
-  for (const line of lines) {
-    if (line.startsWith('event:')) {
-      currentEvent = line.slice('event:'.length).trim();
-      continue;
-    }
-    if (line.startsWith('data:')) {
-      const dataRaw = line.slice('data:'.length).trim();
-      let parsed = dataRaw;
-      try { parsed = JSON.parse(dataRaw); } catch {}
-      events.push({ event: currentEvent || 'message', data: parsed, raw: dataRaw });
-    }
-  }
-
-  return events;
-}
-
-function messageFromSseData(data) {
-  if (Array.isArray(data)) return data[0] ?? null;
-  if (typeof data === 'string') return data;
-  return null;
-}
-
 export default function AdminModel() {
   const [versions, setVersions]     = useState([]);
   const [mlHealth, setMlHealth]     = useState(null);
   const [statusError, setStatusError] = useState('');
   const [trainingStats, setTrainingStats] = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [versionLabel, setVersionLabel] = useState('');
   const [training, setTraining]     = useState(false);
   const [promotingId, setPromotingId] = useState(null);
   const [trainMsg, setTrainMsg]     = useState('');
+  const [includeScrapedDirect, setIncludeScrapedDirect] = useState(false);
   const [pollInterval, setPollInterval] = useState(null);
-  const canStartTrain = !training;
+  const labelledTrainingReady = (trainingStats?.inTraining ?? 0) >= 20;
+  const canStartTrain = Boolean(versionLabel.trim()) && !training && (includeScrapedDirect || labelledTrainingReady);
 
   const loadData = useCallback(async () => {
     try {
@@ -134,10 +110,15 @@ export default function AdminModel() {
   }, [versions]);
 
   async function handleTrain() {
+    if (!versionLabel.trim()) return;
     setTraining(true); setTrainMsg('');
     try {
       const startBody = await apiFetch('/api/model/retrain/start', {
         method: 'POST',
+        body: JSON.stringify({
+          versionLabel: versionLabel.trim(),
+          includeScrapedDirect,
+        }),
       });
 
       const eventId = startBody?.eventId;
@@ -158,6 +139,7 @@ export default function AdminModel() {
               throw new Error('Retrain completed with null response. Check retrain secret.');
             }
             setTrainMsg(String(msg));
+            setVersionLabel('');
             await loadData();
             return;
           }
@@ -193,6 +175,7 @@ export default function AdminModel() {
   }
 
   const activeVersion = versions.find(v => v.is_active);
+  const hfManaged = mlHealth?.disabled || /ML pipeline disabled/i.test(String(mlHealth?.error || ''));
 
   const S = {
     title: { fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:'#1a0a0a', margin:0 },
@@ -217,32 +200,39 @@ export default function AdminModel() {
       {/* ML Service health */}
       <div style={{ ...S.card, marginBottom:20, display:'flex', alignItems:'center', gap:12 }}>
         <div style={{ width:10, height:10, borderRadius:'50%',
-          background: statusError ? '#d97706' : (mlHealth?.available ? '#16a34a' : (mlHealth?.warming_up ? '#d97706' : '#dc2626')) }} />
+          background: hfManaged ? '#16a34a' : (statusError ? '#d97706' : (mlHealth?.available ? '#16a34a' : (mlHealth?.warming_up ? '#d97706' : '#dc2626'))) }} />
         <div style={{ fontSize:13 }}>
           ML Service: <strong>
-            {statusError
+            {hfManaged
+              ? 'Managed by Hugging Face'
+              : statusError
               ? 'Status Unavailable'
               : (mlHealth?.available
                 ? 'Online'
                 : (mlHealth?.warming_up ? 'Warming Up' : 'Offline'))}
           </strong>
+          {hfManaged && (
+            <div style={{ color:'#64748b', marginTop:4, fontSize:11 }}>
+              Local ML pipeline is disabled by config; retraining and inference use Hugging Face endpoints.
+            </div>
+          )}
           {mlHealth?.available && (
             <span style={{ color:'#888', marginLeft:12 }}>
               CLIP {mlHealth.clip_available ? 'loaded' : 'not available'} ·
               Model in memory: {mlHealth.model_loaded ? 'loaded' : 'not loaded'}
             </span>
           )}
-          {!mlHealth?.available && mlHealth?.warming_up && !statusError && (
+          {!hfManaged && !mlHealth?.available && mlHealth?.warming_up && !statusError && (
             <div style={{ color:'#b45309', marginTop:4, fontSize:11 }}>
               ML service is reachable but warming up (gateway {mlHealth.status_code ?? 'transient'}). Retry in 20-40s.
             </div>
           )}
-          {!mlHealth?.available && mlHealth?.checked_url && !statusError && (
+          {!hfManaged && !mlHealth?.available && mlHealth?.checked_url && !statusError && (
             <div style={{ color:'#999', marginTop:4, fontSize:11 }}>
               Checked: {mlHealth.checked_url}
             </div>
           )}
-          {!mlHealth?.available && mlHealth?.error && !statusError && (
+          {!hfManaged && !mlHealth?.available && mlHealth?.error && !statusError && (
             <div style={{ color:'#b45309', marginTop:2, fontSize:11 }}>
               Error: {mlHealth.error}
             </div>
@@ -294,20 +284,44 @@ export default function AdminModel() {
       <div style={{ ...S.card, marginBottom:24 }}>
         <div style={S.sectionTitle}>Trigger Retrain</div>
         <p style={{ fontSize:13, color:'#666', lineHeight:1.6, marginBottom:16 }}>
-          Retraining runs in the Hugging Face queue. The retrain secret is loaded from database config.
+          Training runs in the background. The new model is automatically promoted to active
+          if it performs better than the current version. You can also manually promote any version below.
         </p>
         <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+          <input
+            style={S.input}
+            placeholder="Version label e.g. v1.2"
+            value={versionLabel}
+            onChange={e => setVersionLabel(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleTrain()}
+          />
+          <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#555' }}>
+            <input
+              type="checkbox"
+              checked={includeScrapedDirect}
+              onChange={(e) => setIncludeScrapedDirect(e.target.checked)}
+            />
+            Include directly scraped priced images
+          </label>
           <button
             style={S.btn(!canStartTrain)}
             disabled={!canStartTrain}
             onClick={handleTrain}
           >
-            {training ? 'Running…' : 'Start Retrain'}
+            {training ? 'Starting…' : 'Train'}
           </button>
+        </div>
+        <div style={{ marginTop:8, fontSize:11, color:'#888' }}>
+          When enabled, training uses labelled dataset plus scraped images with extracted price seeds.
         </div>
         {trainMsg && (
           <div style={{ marginTop:12, fontSize:13, color: trainMsg.startsWith('Error') ? '#dc2626' : '#15803d' }}>
             {trainMsg}
+          </div>
+        )}
+        {!includeScrapedDirect && (trainingStats?.inTraining ?? 0) < 20 && (
+          <div style={{ marginTop:10, fontSize:12, color:'#dc2626' }}>
+            <FiAlertTriangle style={{ verticalAlign: 'middle' }} /> Need at least 20 images in the training set. Currently have {trainingStats?.inTraining ?? 0}.
           </div>
         )}
       </div>
