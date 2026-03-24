@@ -61,9 +61,9 @@ function ImageCard({ image, onClick, selected, onRemove }) {
             }}
             title="Remove image"
             style={{
-              position:'absolute', top:8, left:8, zIndex:12,
-              width:24, height:24, borderRadius:'50%', border:'none',
-              background:'rgba(0,0,0,0.68)', color:'#fff', cursor:'pointer',
+              position:'absolute', top:8, right:8, zIndex:12,
+              width:20, height:20, borderRadius:'50%', border:'none',
+              background:'#dc2626', color:'#fff', cursor:'pointer',
               display:'flex', alignItems:'center', justifyContent:'center', fontSize:12,
             }}
           >
