@@ -83,14 +83,6 @@ function sumSupport(support) {
   return null;
 }
 
-function firstFiniteNumber(...values) {
-  for (const value of values) {
-    const n = Number(value);
-    if (Number.isFinite(n)) return n;
-  }
-  return null;
-}
-
 async function downloadMetricsSidecar(versionTag) {
   const path = `versions/${versionTag}/metrics.json`;
   const { data, error } = await supabaseAdmin.storage.from(MODEL_BUCKET).download(path);
@@ -116,15 +108,6 @@ function normalizeMetrics(sidecarMetrics = null, fallbackMetrics = {}) {
   const recall = toFiniteRatio(metrics.recall ?? fallbackMetrics.recall);
   const f1Score = toFiniteRatio(metrics.f1 ?? metrics.f1_score ?? fallbackMetrics.f1_score);
   const support = metrics.support ?? null;
-  const trainingSetSize = firstFiniteNumber(
-    metrics.training_set_size,
-    metrics.train_images,
-    metrics.images_trained,
-    metrics.tagged_rows,
-    metrics.train_rows,
-    metrics.rows_with_embeddings,
-    metrics.rows,
-  );
 
   return {
     accuracy,
@@ -132,7 +115,6 @@ function normalizeMetrics(sidecarMetrics = null, fallbackMetrics = {}) {
     recall,
     f1_score: f1Score,
     support,
-    training_set_size: trainingSetSize,
     test_set_size: sumSupport(support),
   };
 }
@@ -195,7 +177,6 @@ async function upsertModelVersionFromStorage({ metrics = {}, trainedBy = null, n
     recall: normalizedMetrics.recall,
     f1: normalizedMetrics.f1_score,
     support: normalizedMetrics.support,
-    training_set_size: normalizedMetrics.training_set_size,
     version_tag: versionTag,
     created_at: trainedAt,
   };
@@ -213,7 +194,6 @@ async function upsertModelVersionFromStorage({ metrics = {}, trainedBy = null, n
   if (normalizedMetrics.precision != null) payload.precision = normalizedMetrics.precision;
   if (normalizedMetrics.recall != null) payload.recall = normalizedMetrics.recall;
   if (normalizedMetrics.f1_score != null) payload.f1_score = normalizedMetrics.f1_score;
-  if (normalizedMetrics.training_set_size != null) payload.training_set_size = normalizedMetrics.training_set_size;
   if (normalizedMetrics.test_set_size != null) payload.test_set_size = normalizedMetrics.test_set_size;
 
   async function writePayload(writePayloadData) {
