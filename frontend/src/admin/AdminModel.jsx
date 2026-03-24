@@ -67,14 +67,13 @@ export default function AdminModel() {
   const [statusError, setStatusError] = useState('');
   const [trainingStats, setTrainingStats] = useState(null);
   const [loading, setLoading]       = useState(true);
-  const [versionLabel, setVersionLabel] = useState('');
   const [training, setTraining]     = useState(false);
   const [promotingId, setPromotingId] = useState(null);
   const [trainMsg, setTrainMsg]     = useState('');
   const [includeScrapedDirect, setIncludeScrapedDirect] = useState(false);
   const [pollInterval, setPollInterval] = useState(null);
   const labelledTrainingReady = (trainingStats?.inTraining ?? 0) >= 20;
-  const canStartTrain = Boolean(versionLabel.trim()) && !training && (includeScrapedDirect || labelledTrainingReady);
+  const canStartTrain = !training && (includeScrapedDirect || labelledTrainingReady);
 
   const loadData = useCallback(async () => {
     try {
@@ -110,13 +109,12 @@ export default function AdminModel() {
   }, [versions]);
 
   async function handleTrain() {
-    if (!versionLabel.trim()) return;
+    if (!canStartTrain) return;
     setTraining(true); setTrainMsg('');
     try {
       const startBody = await apiFetch('/api/model/retrain/start', {
         method: 'POST',
         body: JSON.stringify({
-          versionLabel: versionLabel.trim(),
           includeScrapedDirect,
         }),
       });
@@ -139,7 +137,6 @@ export default function AdminModel() {
               throw new Error('Retrain completed with null response. Check retrain secret.');
             }
             setTrainMsg(String(msg));
-            setVersionLabel('');
             await loadData();
             return;
           }
@@ -285,16 +282,12 @@ export default function AdminModel() {
         <div style={S.sectionTitle}>Trigger Retrain</div>
         <p style={{ fontSize:13, color:'#666', lineHeight:1.6, marginBottom:16 }}>
           Training runs in the background. The new model is automatically promoted to active
-          if it performs better than the current version. You can also manually promote any version below.
+          if it performs better than the current version. Version names are generated automatically using UTC timestamp format.
         </p>
         <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
-          <input
-            style={S.input}
-            placeholder="Version label e.g. v1.2"
-            value={versionLabel}
-            onChange={e => setVersionLabel(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleTrain()}
-          />
+          <div style={{ ...S.input, width: 260, color:'#666', background:'#f8fafc' }}>
+            Version name: auto-generated (UTC)
+          </div>
           <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#555' }}>
             <input
               type="checkbox"
