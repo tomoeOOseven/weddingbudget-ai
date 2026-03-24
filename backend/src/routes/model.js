@@ -83,6 +83,24 @@ function sumSupport(support) {
   return null;
 }
 
+function parseTrainingSetSize(rawMetrics = {}) {
+  const candidates = [
+    rawMetrics.training_set_size,
+    rawMetrics.images_trained,
+    rawMetrics.image_count,
+    rawMetrics.num_images,
+    rawMetrics.n_images,
+    rawMetrics.train_rows,
+    rawMetrics.rows_trained,
+  ];
+
+  for (const c of candidates) {
+    const n = Number(c);
+    if (Number.isFinite(n) && n > 0) return Math.round(n);
+  }
+  return null;
+}
+
 async function downloadMetricsSidecar(versionTag) {
   const path = `versions/${versionTag}/metrics.json`;
   const { data, error } = await supabaseAdmin.storage.from(MODEL_BUCKET).download(path);
@@ -115,6 +133,7 @@ function normalizeMetrics(sidecarMetrics = null, fallbackMetrics = {}) {
     recall,
     f1_score: f1Score,
     support,
+    training_set_size: parseTrainingSetSize(metrics),
     test_set_size: sumSupport(support),
   };
 }
@@ -194,6 +213,7 @@ async function upsertModelVersionFromStorage({ metrics = {}, trainedBy = null, n
   if (normalizedMetrics.precision != null) payload.precision = normalizedMetrics.precision;
   if (normalizedMetrics.recall != null) payload.recall = normalizedMetrics.recall;
   if (normalizedMetrics.f1_score != null) payload.f1_score = normalizedMetrics.f1_score;
+  if (normalizedMetrics.training_set_size != null) payload.training_set_size = normalizedMetrics.training_set_size;
   if (normalizedMetrics.test_set_size != null) payload.test_set_size = normalizedMetrics.test_set_size;
 
   async function writePayload(writePayloadData) {
