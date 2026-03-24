@@ -22,7 +22,8 @@ async function getRefData() {
   ] = await Promise.all([
     supabase.from('cities').select('*').eq('is_active', true),
     supabase.from('hotel_tiers').select('*').eq('is_active', true),
-    supabase.from('artists').select('*').eq('is_active', true),
+    // Keep estimate artist refs aligned with seeded tiers shown in client page.
+    supabase.from('artists').select('*').eq('is_active', true).eq('is_named', false),
     supabase.from('meals').select('*').eq('is_active', true),
     supabase.from('bar_tiers').select('*').eq('is_active', true),
     supabase.from('specialty_counters').select('*').eq('is_active', true),

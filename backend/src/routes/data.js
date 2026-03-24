@@ -33,7 +33,8 @@ router.get('/all', async (req, res) => {
     ] = await Promise.all([
       supabase.from('cities').select('*').eq('is_active', true).order('label'),
       supabase.from('hotel_tiers').select('*').eq('is_active', true),
-      supabase.from('artists').select('*').eq('is_active', true).order('artist_type'),
+      // Keep client artist page on original seeded tiers, excluding named/CSV-imported acts.
+      supabase.from('artists').select('*').eq('is_active', true).eq('is_named', false).order('artist_type'),
       supabase.from('meals').select('*').eq('is_active', true),
       supabase.from('bar_tiers').select('*').eq('is_active', true),
       supabase.from('specialty_counters').select('*').eq('is_active', true),
