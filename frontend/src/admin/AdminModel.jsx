@@ -3,9 +3,6 @@ import { getToken } from '../lib/tokenStore.js';
 import { fetchFromApi } from '../lib/apiBase.js';
 import { FiActivity, FiAlertTriangle } from 'react-icons/fi';
 
-const HF_SPACE_BASE = 'https://gamerquant-wedding-decor-price.hf.space';
-const HF_RETRAIN_CALL = `${HF_SPACE_BASE}/gradio_api/call/trigger_retrain`;
-
 async function apiFetch(path, opts = {}) {
   const token = getToken();
   const res = await fetchFromApi(path, {
@@ -97,12 +94,11 @@ export default function AdminModel() {
   const [statusError, setStatusError] = useState('');
   const [trainingStats, setTrainingStats] = useState(null);
   const [loading, setLoading]       = useState(true);
-  const [retrainSecret, setRetrainSecret] = useState('');
   const [training, setTraining]     = useState(false);
   const [promotingId, setPromotingId] = useState(null);
   const [trainMsg, setTrainMsg]     = useState('');
   const [pollInterval, setPollInterval] = useState(null);
-  const canStartTrain = Boolean(retrainSecret.trim()) && !training;
+  const canStartTrain = !training;
 
   const loadData = useCallback(async () => {
     try {
@@ -138,23 +134,13 @@ export default function AdminModel() {
   }, [versions]);
 
   async function handleTrain() {
-    if (!retrainSecret.trim()) return;
     setTraining(true); setTrainMsg('');
     try {
-      const startRes = await fetch(HF_RETRAIN_CALL, {
+      const startBody = await apiFetch('/api/model/retrain/start', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: [retrainSecret.trim()],
-        }),
       });
 
-      const startBody = await startRes.json().catch(() => ({}));
-      if (!startRes.ok) {
-        throw new Error(startBody?.error || startBody?.detail || `Retrain start failed (${startRes.status})`);
-      }
-
-      const eventId = startBody?.event_id;
+      const eventId = startBody?.eventId;
       if (!eventId) {
         throw new Error('Retrain start did not return an event_id.');
       }
@@ -163,28 +149,15 @@ export default function AdminModel() {
 
       const maxAttempts = 240;
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-        const pollRes = await fetch(`${HF_RETRAIN_CALL}/${eventId}`, {
-          method: 'GET',
-          headers: { Accept: 'text/event-stream' },
-          cache: 'no-store',
-        });
+        const poll = await apiFetch(`/api/model/retrain/poll/${encodeURIComponent(eventId)}`);
 
-        const rawText = await pollRes.text();
-        if (!pollRes.ok) {
-          throw new Error(`Retrain poll failed (${pollRes.status})`);
-        }
-
-        const events = parseSseEvents(rawText);
-        const latest = events.length ? events[events.length - 1] : null;
-
-        if (latest) {
-          const msg = messageFromSseData(latest.data);
-          if (latest.event === 'complete') {
+        if (poll) {
+          const msg = poll.message;
+          if (poll.complete) {
             if (msg == null) {
               throw new Error('Retrain completed with null response. Check retrain secret.');
             }
             setTrainMsg(String(msg));
-            setRetrainSecret('');
             await loadData();
             return;
           }
@@ -321,17 +294,9 @@ export default function AdminModel() {
       <div style={{ ...S.card, marginBottom:24 }}>
         <div style={S.sectionTitle}>Trigger Retrain</div>
         <p style={{ fontSize:13, color:'#666', lineHeight:1.6, marginBottom:16 }}>
-          Retraining runs in the Hugging Face queue. Enter the retrain secret to start and monitor the run status.
+          Retraining runs in the Hugging Face queue. The retrain secret is loaded from database config.
         </p>
         <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
-          <input
-            style={S.input}
-            type="password"
-            placeholder="Retrain secret"
-            value={retrainSecret}
-            onChange={e => setRetrainSecret(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleTrain()}
-          />
           <button
             style={S.btn(!canStartTrain)}
             disabled={!canStartTrain}

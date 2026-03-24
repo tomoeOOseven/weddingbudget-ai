@@ -4,6 +4,61 @@ const router  = express.Router();
 const { requireAdmin, supabaseAdmin } = require('../middleware/authMiddleware');
 const { triggerTraining, getModelStatus, checkHealth } = require('../services/mlService');
 
+const HF_SPACE_BASE = 'https://gamerquant-wedding-decor-price.hf.space';
+const HF_RETRAIN_CALL = `${HF_SPACE_BASE}/gradio_api/call/trigger_retrain`;
+const RETRAIN_SECRET_CONTENT_KEY = 'ml_retrain';
+
+function parseSseEvents(rawText) {
+  const lines = String(rawText || '').split(/\r?\n/);
+  const events = [];
+  let currentEvent = '';
+
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      currentEvent = line.slice('event:'.length).trim();
+      continue;
+    }
+    if (line.startsWith('data:')) {
+      const dataRaw = line.slice('data:'.length).trim();
+      let parsed = dataRaw;
+      try {
+        parsed = JSON.parse(dataRaw);
+      } catch {
+        // keep raw string
+      }
+      events.push({ event: currentEvent || 'message', data: parsed, raw: dataRaw });
+    }
+  }
+
+  return events;
+}
+
+function messageFromSseData(data) {
+  if (Array.isArray(data)) return data[0] ?? null;
+  if (typeof data === 'string') return data;
+  return null;
+}
+
+async function getRetrainSecretFromDb() {
+  const { data, error } = await supabaseAdmin
+    .from('website_content')
+    .select('content')
+    .eq('content_key', RETRAIN_SECRET_CONTENT_KEY)
+    .single();
+
+  if (error) {
+    throw new Error('Retrain secret is not configured in database.');
+  }
+
+  const content = data?.content ?? {};
+  const secret = String(content?.secret || content?.retrainSecret || '').trim();
+  if (!secret) {
+    throw new Error('Retrain secret is empty in database.');
+  }
+
+  return secret;
+}
+
 // GET /api/model/status
 router.get('/status', requireAdmin, async (req, res) => {
   const [mlHealth, { data: versions }] = await Promise.all([
@@ -77,6 +132,76 @@ router.get('/run/:id', requireAdmin, async (req, res) => {
     .from('training_runs').select('*').eq('id', req.params.id).single();
   if (error) return res.status(404).json({ error: 'Run not found.' });
   res.json(data);
+});
+
+// POST /api/model/retrain/start
+// Starts HF queued retrain using a secret loaded from database.
+router.post('/retrain/start', requireAdmin, async (req, res) => {
+  try {
+    const retrainSecret = await getRetrainSecretFromDb();
+
+    const startRes = await fetch(HF_RETRAIN_CALL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: [retrainSecret] }),
+    });
+
+    const body = await startRes.json().catch(() => ({}));
+    if (!startRes.ok) {
+      return res.status(startRes.status).json({
+        error: body?.error || body?.detail || `Retrain start failed (${startRes.status})`,
+      });
+    }
+
+    if (!body?.event_id) {
+      return res.status(502).json({ error: 'HF retrain start returned no event_id.' });
+    }
+
+    res.json({ eventId: body.event_id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/model/retrain/poll/:eventId
+// Polls HF queued retrain status and returns the latest SSE event message.
+router.get('/retrain/poll/:eventId', requireAdmin, async (req, res) => {
+  try {
+    const eventId = String(req.params.eventId || '').trim();
+    if (!eventId) {
+      return res.status(400).json({ error: 'eventId is required.' });
+    }
+
+    const pollRes = await fetch(`${HF_RETRAIN_CALL}/${encodeURIComponent(eventId)}`, {
+      method: 'GET',
+      headers: { Accept: 'text/event-stream' },
+      cache: 'no-store',
+    });
+
+    const rawText = await pollRes.text();
+    if (!pollRes.ok) {
+      return res.status(pollRes.status).json({ error: `Retrain poll failed (${pollRes.status})` });
+    }
+
+    const events = parseSseEvents(rawText);
+    const latest = events.length ? events[events.length - 1] : null;
+
+    if (!latest) {
+      return res.json({ complete: false, event: null, message: null });
+    }
+
+    const message = messageFromSseData(latest.data);
+    const complete = latest.event === 'complete';
+
+    res.json({
+      complete,
+      event: latest.event,
+      message,
+      isNullResult: complete && message == null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
