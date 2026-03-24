@@ -3,6 +3,16 @@ const express = require('express');
 const router  = express.Router();
 const { supabase } = require('../lib/supabaseClient');
 
+function parseArtistNotes(notes) {
+  const out = {};
+  String(notes || '').split('|').forEach((chunk) => {
+    const [k, ...rest] = chunk.split('=');
+    if (!k || rest.length === 0) return;
+    out[k.trim()] = rest.join('=').trim();
+  });
+  return out;
+}
+
 function derivePriceRangeTag(priceInr) {
   if (!Number.isFinite(Number(priceInr))) return null;
   const p = Number(priceInr);
@@ -25,7 +35,10 @@ function rangeBounds(tag, fallbackPrice) {
 
 function buildArtistPriceRanges(artists) {
   const values = (artists ?? [])
-    .map((a) => Number(a.cost_min ?? a.cost_max))
+    .map((a) => {
+      const meta = parseArtistNotes(a.notes);
+      return Number(a.price_inr ?? meta.price_inr ?? a.cost_min ?? a.cost_max);
+    })
     .filter((v) => Number.isFinite(v));
   if (!values.length) {
     return {
@@ -128,8 +141,9 @@ router.get('/all', async (req, res) => {
     res.json({
       cities: cityMap, hotelTiers: hotelMap,
       artists: (artists ?? []).map(a => {
-        const value = Number(a.cost_min ?? a.cost_max);
-        const priceRangeTag = artistRangeTagForValue(value, artistRanges);
+        const meta = parseArtistNotes(a.notes);
+        const value = Number(a.price_inr ?? meta.price_inr ?? a.cost_min ?? a.cost_max);
+        const priceRangeTag = a.price_range_tag || meta.price_range_tag || artistRangeTagForValue(value, artistRanges);
         const range = priceRangeTag ? artistRanges[priceRangeTag] : null;
         return {
           id: a.id,
@@ -137,6 +151,9 @@ router.get('/all', async (req, res) => {
           label: a.label,
           type: a.artist_type,
           isNamed: a.is_named,
+          imageUrl: a.image_url ?? meta.image_url ?? null,
+          profileUrl: a.profile_url ?? meta.profile_url ?? null,
+          priceInr: a.price_inr ?? (Number.isFinite(value) ? value : null),
           costMin: a.cost_min,
           costMax: a.cost_max,
           priceRangeTag,

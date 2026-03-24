@@ -257,8 +257,11 @@ export default function AdminCostData() {
               columns={[
                 { key:'label',       label:'Artist / Tier', editable:true },
                 { key:'artist_type', label:'Type' },
-                { key:'cost_min',    label:'Fee Min (₹)', editable:true, type:'number' },
-                { key:'cost_max',    label:'Fee Max (₹)', editable:true, type:'number' },
+                { key:'price_inr',   label:'Entered Price (₹)', editable:true, type:'number' },
+                { key:'price_range_tag', label:'Price Tag' },
+                { key:'cost_min',    label:'Range Min (₹)' },
+                { key:'cost_max',    label:'Range Max (₹)' },
+                { key:'image_url',   label:'Image URL', editable:true },
                 { key:'version',     label:'Ver', render:r => `v${r.version}` },
               ]}
               onUpdate={updateArtist}
@@ -384,7 +387,14 @@ export default function AdminCostData() {
 }
 
 function AddArtistForm({ onSave }) {
-  const [f, setF] = useState({ label:'', artist_type:'DJ', cost_min:'', cost_max:'', is_named: false });
+  const [f, setF] = useState({
+    label:'',
+    artist_type:'DJ',
+    price_inr:'',
+    image_url:'',
+    profile_url:'',
+    is_named: false,
+  });
   const s = (k,v) => setF(x => ({...x,[k]:v}));
   const inputStyle = { padding:'8px 10px', border:'1px solid #e0d5c5', borderRadius:7, fontSize:13, fontFamily:'inherit', outline:'none' };
 
@@ -396,9 +406,10 @@ function AddArtistForm({ onSave }) {
           {['DJ','Band','Singer','Folk','Anchor','Choreo','Myra','Other'].map(t=><option key={t}>{t}</option>)}
         </select>
       </div>
-      <div><label style={{ fontSize:10, color:'#888', display:'block', marginBottom:4 }}>MIN (₹)</label><input style={inputStyle} type="number" value={f.cost_min} onChange={e=>s('cost_min',e.target.value)} placeholder="50000" /></div>
-      <div><label style={{ fontSize:10, color:'#888', display:'block', marginBottom:4 }}>MAX (₹)</label><input style={inputStyle} type="number" value={f.cost_max} onChange={e=>s('cost_max',e.target.value)} placeholder="150000" /></div>
-      <button onClick={() => f.label && f.cost_min && f.cost_max && onSave({ ...f, cost_min:parseInt(f.cost_min), cost_max:parseInt(f.cost_max) })}
+      <div><label style={{ fontSize:10, color:'#888', display:'block', marginBottom:4 }}>PRICE (₹)</label><input style={inputStyle} type="number" value={f.price_inr} onChange={e=>s('price_inr',e.target.value)} placeholder="50000" /></div>
+      <div><label style={{ fontSize:10, color:'#888', display:'block', marginBottom:4 }}>IMAGE URL</label><input style={inputStyle} value={f.image_url} onChange={e=>s('image_url',e.target.value)} placeholder="https://..." /></div>
+      <div><label style={{ fontSize:10, color:'#888', display:'block', marginBottom:4 }}>PROFILE URL</label><input style={inputStyle} value={f.profile_url} onChange={e=>s('profile_url',e.target.value)} placeholder="https://..." /></div>
+      <button onClick={() => f.label && f.price_inr && onSave({ ...f, price_inr:parseInt(f.price_inr, 10) })}
         style={{ padding:'8px 16px', background:'#7a1c1c', border:'none', borderRadius:7, color:'#E8C97A', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
         Add Artist
       </button>

@@ -168,10 +168,15 @@ export function useBudget(refData) {
     });
 
     // 2. Décor & Design
+    const baseDecorMinPerFn = 200000 * (hd.decorMult ?? 1) * cm;
+    const baseDecorMaxPerFn = 500000 * (hd.decorMult ?? 1) * cm;
+
     if (inputs.selectedDecors.size > 0) {
+      let selectedCount = 0;
       [...inputs.selectedDecors].forEach(dId => {
         const d = DECORS.find(x => x.id === dId);
         if (d) {
+          selectedCount += 1;
           const range = decorBoundsFromTag(d.priceRangeTag);
           if (range) {
             items.push({
@@ -189,12 +194,22 @@ export function useBudget(refData) {
           }
         }
       });
+
+      const remainingFunctions = Math.max(0, nFn - selectedCount);
+      if (remainingFunctions > 0) {
+        items.push({
+          cat: 'Décor & Design',
+          sub: `${remainingFunctions} function${remainingFunctions > 1 ? 's' : ''} - baseline`,
+          min: baseDecorMinPerFn * remainingFunctions,
+          max: baseDecorMaxPerFn * remainingFunctions,
+        });
+      }
     } else {
       items.push({
         cat: 'Décor & Design',
-        sub: `${nFn} functions — default estimate`,
-        min: 200000 * (hd.decorMult ?? 1) * cm * nFn,
-        max: 500000 * (hd.decorMult ?? 1) * cm * nFn,
+        sub: `${nFn} functions - baseline`,
+        min: baseDecorMinPerFn * nFn,
+        max: baseDecorMaxPerFn * nFn,
       });
     }
 

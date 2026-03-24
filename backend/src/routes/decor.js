@@ -20,11 +20,16 @@ router.get('/scraped', async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
   let query = supabase
     .from('scraped_images')
-    .select(`id, title, storage_path, image_url, image_labels ( function_type, style, complexity, cost_seed_min, cost_seed_max )`, { count: 'exact' })
+    .select(`id, title, storage_path, image_url, price_inr, price_range_tag, image_labels ( function_type, style, complexity, cost_seed_min, cost_seed_max )`, { count: 'exact' })
     .eq('status', 'labelled')
+    .not('price_range_tag', 'is', null)
+    .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (req.query.function) {
     query = query.eq('image_labels.function_type', req.query.function);
+  }
+  if (req.query.priceRangeTag) {
+    query = query.eq('price_range_tag', req.query.priceRangeTag);
   }
   const { data, count, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
@@ -32,6 +37,8 @@ router.get('/scraped', async (req, res) => {
   const images = (data ?? []).filter(img => img.image_labels?.length > 0).map(img => ({
     id: img.id, label: img.title ?? 'Scraped Design',
     ...img.image_labels[0],
+    priceInr: img.price_inr,
+    priceRangeTag: img.price_range_tag,
     publicUrl: img.storage_path ? `${SURL}/storage/v1/object/public/decor-images/${img.storage_path}` : img.image_url,
   }));
   res.json({ count, images, offset, limit });
