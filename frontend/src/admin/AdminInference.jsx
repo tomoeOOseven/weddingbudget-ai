@@ -150,7 +150,8 @@ export default function AdminInference() {
           },
           selected.title || 'test decor',
           sourceDomain || 'wedmegood.com',
-          '',
+          listingUrl || '',
+          'active',
         ],
       };
 
