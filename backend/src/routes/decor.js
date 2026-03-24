@@ -4,15 +4,6 @@ const router  = express.Router();
 const { supabase } = require('../lib/supabaseClient');
 const { predictCost } = require('../services/mlService');
 
-function derivePriceRangeTag(priceInr) {
-  if (!Number.isFinite(Number(priceInr))) return null;
-  const p = Number(priceInr);
-  if (p >= 1000 && p < 15000) return 'Budget';
-  if (p >= 15000 && p < 80000) return 'Mid-Range';
-  if (p >= 80000 && p <= 500000) return 'Premium';
-  return null;
-}
-
 // GET /api/decor — list all decor (seed + scraped)
 router.get('/', async (req, res) => {
   let query = supabase.from('decor_items').select('*').eq('is_active', true).order('function_type');
@@ -27,12 +18,10 @@ router.get('/', async (req, res) => {
 router.get('/scraped', async (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit) || 50, 200);
   const offset = parseInt(req.query.offset) || 0;
-  const requestedTag = req.query.priceRangeTag || null;
   let query = supabase
     .from('scraped_images')
-    .select(`id, title, storage_path, image_url, price_inr, price_range_tag, image_labels ( function_type, style, complexity, cost_seed_min, cost_seed_max )`, { count: 'exact' })
+    .select(`id, title, storage_path, image_url, image_labels ( function_type, style, complexity, cost_seed_min, cost_seed_max )`, { count: 'exact' })
     .eq('status', 'labelled')
-    .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (req.query.function) {
     query = query.eq('image_labels.function_type', req.query.function);
@@ -40,32 +29,12 @@ router.get('/scraped', async (req, res) => {
   const { data, count, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   const SURL = process.env.SUPABASE_URL;
-  const images = (data ?? [])
-    .filter(img => img.image_labels?.length > 0)
-    .map((img) => {
-      const lbl = img.image_labels[0] ?? {};
-      const seedMid = Number.isFinite(Number(lbl.cost_seed_min)) && Number.isFinite(Number(lbl.cost_seed_max))
-        ? Math.round((Number(lbl.cost_seed_min) + Number(lbl.cost_seed_max)) / 2)
-        : null;
-      const derivedTag = derivePriceRangeTag(img.price_inr ?? seedMid);
-      const tag = img.price_range_tag || derivedTag;
-      const imageUrl = img.storage_path
-        ? `${SURL}/storage/v1/object/public/decor-images/${img.storage_path}`
-        : img.image_url;
-      return {
-        id: img.id,
-        label: img.title ?? 'Scraped Design',
-        ...lbl,
-        priceInr: img.price_inr,
-        priceRangeTag: tag,
-        imageUrl,
-        publicUrl: imageUrl,
-      };
-    })
-    .filter((img) => !requestedTag || img.priceRangeTag === requestedTag);
-
-  const filteredCount = requestedTag ? images.length : count;
-  res.json({ count: filteredCount, images, offset, limit });
+  const images = (data ?? []).filter(img => img.image_labels?.length > 0).map(img => ({
+    id: img.id, label: img.title ?? 'Scraped Design',
+    ...img.image_labels[0],
+    publicUrl: img.storage_path ? `${SURL}/storage/v1/object/public/decor-images/${img.storage_path}` : img.image_url,
+  }));
+  res.json({ count, images, offset, limit });
 });
 
 // POST /api/decor/score — AI cost prediction using ML service
