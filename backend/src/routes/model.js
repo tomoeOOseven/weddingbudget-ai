@@ -7,6 +7,7 @@ const { triggerTraining, getModelStatus, checkHealth } = require('../services/ml
 const HF_SPACE_BASE = 'https://gamerquant-wedding-decor-price.hf.space';
 const HF_RETRAIN_CALL = `${HF_SPACE_BASE}/gradio_api/call/trigger_retrain`;
 const RETRAIN_SECRET_CONTENT_KEY = 'ml_retrain';
+const MODEL_BUCKET = 'ml-models';
 
 function parseSseEvents(rawText) {
   const lines = String(rawText || '').split(/\r?\n/);
@@ -37,6 +38,122 @@ function messageFromSseData(data) {
   if (Array.isArray(data)) return data[0] ?? null;
   if (typeof data === 'string') return data;
   return null;
+}
+
+function parsePercentOrRatio(raw) {
+  if (raw == null) return null;
+  const text = String(raw).trim();
+  const isPercent = text.endsWith('%');
+  const n = Number.parseFloat(text.replace('%', ''));
+  if (!Number.isFinite(n)) return null;
+  if (isPercent || n > 1) return Math.max(0, Math.min(1, n / 100));
+  return Math.max(0, Math.min(1, n));
+}
+
+function parseMetricsFromMessage(message) {
+  const text = String(message || '');
+  const capture = (pattern) => text.match(pattern)?.[1] ?? null;
+
+  return {
+    accuracy: parsePercentOrRatio(capture(/(?:\bacc(?:uracy)?\b)\s*[:=]\s*([0-9]+(?:\.[0-9]+)?%?)/i)),
+    precision: parsePercentOrRatio(capture(/\bprecision\b\s*[:=]\s*([0-9]+(?:\.[0-9]+)?%?)/i)),
+    recall: parsePercentOrRatio(capture(/\brecall\b\s*[:=]\s*([0-9]+(?:\.[0-9]+)?%?)/i)),
+    f1_score: parsePercentOrRatio(capture(/\bf1\b\s*[:=]\s*([0-9]+(?:\.[0-9]+)?%?)/i)),
+  };
+}
+
+function parseVersionTagToIsoUtc(tag) {
+  const m = String(tag || '').match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$/);
+  if (!m) return new Date().toISOString();
+  const [, y, mo, d, h, mi, s] = m;
+  return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s))).toISOString();
+}
+
+async function getLatestVersionTagFromStorage() {
+  const versionPattern = /^\d{8}_\d{6}$/;
+
+  const { data: versionFolders, error } = await supabaseAdmin.storage
+    .from(MODEL_BUCKET)
+    .list('versions', { limit: 1000, sortBy: { column: 'name', order: 'desc' } });
+
+  if (error) throw new Error(`Failed to list model versions in storage: ${error.message}`);
+
+  const candidates = (versionFolders ?? [])
+    .map((entry) => entry?.name)
+    .filter((name) => versionPattern.test(String(name || '')))
+    .sort((a, b) => String(b).localeCompare(String(a)));
+
+  if (!candidates.length) return null;
+  return candidates[0];
+}
+
+async function upsertModelVersionFromStorage({ metrics = {}, trainedBy = null, notes = null }) {
+  const versionTag = await getLatestVersionTagFromStorage();
+  if (!versionTag) return null;
+
+  const modelPath = `versions/${versionTag}/model.joblib`;
+  const trainedAt = parseVersionTagToIsoUtc(versionTag);
+
+  // Ensure the folder has the core artifacts before writing DB state.
+  const { data: artifacts, error: listErr } = await supabaseAdmin.storage
+    .from(MODEL_BUCKET)
+    .list(`versions/${versionTag}`, { limit: 100 });
+  if (listErr) throw new Error(`Failed to verify model artifacts: ${listErr.message}`);
+
+  const names = new Set((artifacts ?? []).map((a) => a?.name));
+  if (!names.has('model.joblib') || !names.has('transforms.joblib') || !names.has('label_encoder.joblib')) {
+    throw new Error(`Model artifacts incomplete for version ${versionTag}.`);
+  }
+
+  const { data: existing, error: existingErr } = await supabaseAdmin
+    .from('model_versions')
+    .select('id')
+    .eq('version_label', versionTag)
+    .maybeSingle();
+  if (existingErr) throw new Error(existingErr.message);
+
+  const payload = {
+    version_label: versionTag,
+    status: 'ready',
+    model_file_path: modelPath,
+    trained_at: trainedAt,
+    notes: notes || null,
+  };
+
+  if (trainedBy) payload.trained_by = trainedBy;
+  if (metrics.accuracy != null) payload.accuracy = metrics.accuracy;
+  if (metrics.precision != null) payload.precision = metrics.precision;
+  if (metrics.recall != null) payload.recall = metrics.recall;
+  if (metrics.f1_score != null) payload.f1_score = metrics.f1_score;
+
+  if (existing?.id) {
+    const { error: updateErr } = await supabaseAdmin
+      .from('model_versions')
+      .update(payload)
+      .eq('id', existing.id);
+    if (updateErr) throw new Error(updateErr.message);
+  } else {
+    const { error: insertErr } = await supabaseAdmin
+      .from('model_versions')
+      .insert(payload);
+    if (insertErr) throw new Error(insertErr.message);
+  }
+
+  // Make this version active (single-active invariant).
+  const { error: deactivateErr } = await supabaseAdmin
+    .from('model_versions')
+    .update({ is_active: false })
+    .neq('version_label', versionTag)
+    .eq('is_active', true);
+  if (deactivateErr) throw new Error(deactivateErr.message);
+
+  const { error: activateErr } = await supabaseAdmin
+    .from('model_versions')
+    .update({ is_active: true })
+    .eq('version_label', versionTag);
+  if (activateErr) throw new Error(activateErr.message);
+
+  return versionTag;
 }
 
 async function getRetrainSecretFromDb() {
@@ -193,11 +310,29 @@ router.get('/retrain/poll/:eventId', requireAdmin, async (req, res) => {
     const message = messageFromSseData(latest.data);
     const complete = latest.event === 'complete';
 
+    let syncedVersionLabel = null;
+    if (complete && message != null) {
+      const msgText = String(message);
+      const looksSuccessful = !/\b(retrain failed|\bduplicate\b|error|exception|traceback|\b❌\b)\b/i.test(msgText);
+      if (looksSuccessful) {
+        try {
+          syncedVersionLabel = await upsertModelVersionFromStorage({
+            metrics: parseMetricsFromMessage(msgText),
+            trainedBy: req.profile?.id ?? null,
+            notes: 'Synced from HF retrain completion event.',
+          });
+        } catch (syncErr) {
+          return res.status(500).json({ error: `Retrain finished but DB sync failed: ${syncErr.message}` });
+        }
+      }
+    }
+
     res.json({
       complete,
       event: latest.event,
       message,
       isNullResult: complete && message == null,
+      syncedVersionLabel,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
