@@ -38,7 +38,7 @@ function StatPill({ label, value, color = '#7a1c1c' }) {
 }
 
 // ── Image Card ───────────────────────────────────────────────────────────────
-function ImageCard({ image, onClick, selected }) {
+function ImageCard({ image, onClick, selected, onRemove }) {
   const hasPendingSuggestion = image.ai_label_suggestions?.some(s => s.status === 'pending');
   const isLabelled           = image.status === 'labelled';
 
@@ -53,6 +53,23 @@ function ImageCard({ image, onClick, selected }) {
       }}
     >
       <div style={{ height:160, background:'#f5f0eb', overflow:'hidden', position:'relative' }}>
+        {onRemove && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove(image);
+            }}
+            title="Remove image"
+            style={{
+              position:'absolute', top:8, left:8, zIndex:12,
+              width:24, height:24, borderRadius:'50%', border:'none',
+              background:'rgba(0,0,0,0.68)', color:'#fff', cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', fontSize:12,
+            }}
+          >
+            <FiX />
+          </button>
+        )}
         <img src={image.publicUrl} alt={image.title ?? 'Decor image'} loading="lazy"
           style={{ width:'100%', height:'100%', objectFit:'cover' }}
           onError={e => { e.target.style.display='none'; }} />
@@ -473,6 +490,27 @@ export default function AdminLabelling() {
     setSelected(null);
   }
 
+  async function handleRemoveImage(image) {
+    const title = image?.title ? `\"${image.title}\"` : 'this image';
+    if (!window.confirm(`Remove ${title} from database queue?`)) return;
+
+    try {
+      await apiFetch(`/api/labelling/image/${image.id}`, { method: 'DELETE' });
+      setImages((prev) => prev.filter((x) => x.id !== image.id));
+      setTotal((prev) => Math.max(0, prev - 1));
+      if (selected?.id === image.id) setSelected(null);
+      setBatchSelected((prev) => {
+        if (!prev.has(image.id)) return prev;
+        const next = new Set(prev);
+        next.delete(image.id);
+        return next;
+      });
+      loadStats();
+    } catch (e) {
+      window.alert(`Failed to remove image: ${e.message}`);
+    }
+  }
+
   async function handleBatchAutoTag() {
     if (!batchSelected.size) return;
     setBatchMsg('');
@@ -727,7 +765,12 @@ export default function AdminLabelling() {
                   display:'flex', alignItems:'center', justifyContent:'center',
                   fontSize:12, fontWeight:700 }}><FiCheck /></div>
               )}
-              <ImageCard image={img} onClick={() => {}} selected={!batchMode && selected?.id === img.id} />
+              <ImageCard
+                image={img}
+                onClick={() => {}}
+                selected={!batchMode && selected?.id === img.id}
+                onRemove={batchMode ? null : handleRemoveImage}
+              />
             </div>
           ))}
         </div>

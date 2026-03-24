@@ -4,6 +4,7 @@
 //
 // GET  /api/labelling/queue             — paginated raw images awaiting labels
 // GET  /api/labelling/image/:id         — single image detail
+// DELETE /api/labelling/image/:id        — remove scraped image from DB queue
 // POST /api/labelling/label             — submit a manual label
 // POST /api/labelling/autotag/:imageId  — trigger AI auto-tag for one image
 // POST /api/labelling/autotag/batch     — AI auto-tag multiple images
@@ -106,6 +107,40 @@ router.get('/image/:id', requireAdmin, async (req, res) => {
       ? `${process.env.SUPABASE_URL}/storage/v1/object/public/decor-images/${data.storage_path}`
       : data.image_url,
   });
+});
+
+// ── DELETE /api/labelling/image/:id ───────────────────────────────────────
+router.delete('/image/:id([0-9a-fA-F-]{36})', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  const { data: existing, error: findError } = await supabaseAdmin
+    .from('scraped_images')
+    .select('id, title')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (findError) return res.status(500).json({ error: findError.message });
+  if (!existing) return res.status(404).json({ error: 'Image not found.' });
+
+  const { error: suggestionsDeleteError } = await supabaseAdmin
+    .from('ai_label_suggestions')
+    .delete()
+    .eq('image_id', id);
+  if (suggestionsDeleteError) return res.status(500).json({ error: suggestionsDeleteError.message });
+
+  const { error: labelsDeleteError } = await supabaseAdmin
+    .from('image_labels')
+    .delete()
+    .eq('image_id', id);
+  if (labelsDeleteError) return res.status(500).json({ error: labelsDeleteError.message });
+
+  const { error: imageDeleteError } = await supabaseAdmin
+    .from('scraped_images')
+    .delete()
+    .eq('id', id);
+  if (imageDeleteError) return res.status(500).json({ error: imageDeleteError.message });
+
+  res.json({ message: 'Image removed from database queue.', id });
 });
 
 // ── POST /api/labelling/label ──────────────────────────────────────────────
