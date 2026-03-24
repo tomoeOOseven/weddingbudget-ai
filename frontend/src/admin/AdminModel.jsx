@@ -3,6 +3,9 @@ import { getToken } from '../lib/tokenStore.js';
 import { fetchFromApi } from '../lib/apiBase.js';
 import { FiActivity, FiAlertTriangle } from 'react-icons/fi';
 
+const HF_SPACE_BASE = 'https://gamerquant-wedding-decor-price.hf.space';
+const HF_RETRAIN_CALL = `${HF_SPACE_BASE}/gradio_api/call/trigger_retrain`;
+
 async function apiFetch(path, opts = {}) {
   const token = getToken();
   const res = await fetchFromApi(path, {
@@ -57,20 +60,49 @@ function StatusBadge({ status }) {
   );
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseSseEvents(rawText) {
+  const lines = String(rawText || '').split(/\r?\n/);
+  const events = [];
+  let currentEvent = '';
+
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      currentEvent = line.slice('event:'.length).trim();
+      continue;
+    }
+    if (line.startsWith('data:')) {
+      const dataRaw = line.slice('data:'.length).trim();
+      let parsed = dataRaw;
+      try { parsed = JSON.parse(dataRaw); } catch {}
+      events.push({ event: currentEvent || 'message', data: parsed, raw: dataRaw });
+    }
+  }
+
+  return events;
+}
+
+function messageFromSseData(data) {
+  if (Array.isArray(data)) return data[0] ?? null;
+  if (typeof data === 'string') return data;
+  return null;
+}
+
 export default function AdminModel() {
   const [versions, setVersions]     = useState([]);
   const [mlHealth, setMlHealth]     = useState(null);
   const [statusError, setStatusError] = useState('');
   const [trainingStats, setTrainingStats] = useState(null);
   const [loading, setLoading]       = useState(true);
-  const [versionLabel, setVersionLabel] = useState('');
+  const [retrainSecret, setRetrainSecret] = useState('');
   const [training, setTraining]     = useState(false);
   const [promotingId, setPromotingId] = useState(null);
   const [trainMsg, setTrainMsg]     = useState('');
-  const [includeScrapedDirect, setIncludeScrapedDirect] = useState(false);
   const [pollInterval, setPollInterval] = useState(null);
-  const labelledTrainingReady = (trainingStats?.inTraining ?? 0) >= 20;
-  const canStartTrain = Boolean(versionLabel.trim()) && !training && (includeScrapedDirect || labelledTrainingReady);
+  const canStartTrain = Boolean(retrainSecret.trim()) && !training;
 
   const loadData = useCallback(async () => {
     try {
@@ -106,19 +138,66 @@ export default function AdminModel() {
   }, [versions]);
 
   async function handleTrain() {
-    if (!versionLabel.trim()) return;
+    if (!retrainSecret.trim()) return;
     setTraining(true); setTrainMsg('');
     try {
-      const data = await apiFetch('/api/model/train', {
+      const startRes = await fetch(HF_RETRAIN_CALL, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          versionLabel: versionLabel.trim(),
-          includeScrapedDirect,
+          data: [retrainSecret.trim()],
         }),
       });
-      setTrainMsg(`Training started - ${data.message}`);
-      setVersionLabel('');
-      setTimeout(loadData, 1000);
+
+      const startBody = await startRes.json().catch(() => ({}));
+      if (!startRes.ok) {
+        throw new Error(startBody?.error || startBody?.detail || `Retrain start failed (${startRes.status})`);
+      }
+
+      const eventId = startBody?.event_id;
+      if (!eventId) {
+        throw new Error('Retrain start did not return an event_id.');
+      }
+
+      setTrainMsg(`Retrain queued. Event ID: ${eventId}`);
+
+      const maxAttempts = 240;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const pollRes = await fetch(`${HF_RETRAIN_CALL}/${eventId}`, {
+          method: 'GET',
+          headers: { Accept: 'text/event-stream' },
+          cache: 'no-store',
+        });
+
+        const rawText = await pollRes.text();
+        if (!pollRes.ok) {
+          throw new Error(`Retrain poll failed (${pollRes.status})`);
+        }
+
+        const events = parseSseEvents(rawText);
+        const latest = events.length ? events[events.length - 1] : null;
+
+        if (latest) {
+          const msg = messageFromSseData(latest.data);
+          if (latest.event === 'complete') {
+            if (msg == null) {
+              throw new Error('Retrain completed with null response. Check retrain secret.');
+            }
+            setTrainMsg(String(msg));
+            setRetrainSecret('');
+            await loadData();
+            return;
+          }
+
+          if (msg) {
+            setTrainMsg(String(msg));
+          }
+        }
+
+        await sleep(3000);
+      }
+
+      throw new Error('Retrain polling timed out before completion.');
     } catch (e) { setTrainMsg(`Error: ${e.message}`); }
     finally { setTraining(false); }
   }
@@ -242,44 +321,28 @@ export default function AdminModel() {
       <div style={{ ...S.card, marginBottom:24 }}>
         <div style={S.sectionTitle}>Trigger Retrain</div>
         <p style={{ fontSize:13, color:'#666', lineHeight:1.6, marginBottom:16 }}>
-          Training runs in the background. The new model is automatically promoted to active
-          if it performs better than the current version. You can also manually promote any version below.
+          Retraining runs in the Hugging Face queue. Enter the retrain secret to start and monitor the run status.
         </p>
         <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
           <input
             style={S.input}
-            placeholder="Version label e.g. v1.2"
-            value={versionLabel}
-            onChange={e => setVersionLabel(e.target.value)}
+            type="password"
+            placeholder="Retrain secret"
+            value={retrainSecret}
+            onChange={e => setRetrainSecret(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleTrain()}
           />
-          <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#555' }}>
-            <input
-              type="checkbox"
-              checked={includeScrapedDirect}
-              onChange={(e) => setIncludeScrapedDirect(e.target.checked)}
-            />
-            Include directly scraped priced images
-          </label>
           <button
             style={S.btn(!canStartTrain)}
             disabled={!canStartTrain}
             onClick={handleTrain}
           >
-            {training ? 'Starting…' : 'Train'}
+            {training ? 'Running…' : 'Start Retrain'}
           </button>
-        </div>
-        <div style={{ marginTop:8, fontSize:11, color:'#888' }}>
-          When enabled, training uses labelled dataset plus scraped images with extracted price seeds.
         </div>
         {trainMsg && (
           <div style={{ marginTop:12, fontSize:13, color: trainMsg.startsWith('Error') ? '#dc2626' : '#15803d' }}>
             {trainMsg}
-          </div>
-        )}
-        {!includeScrapedDirect && (trainingStats?.inTraining ?? 0) < 20 && (
-          <div style={{ marginTop:10, fontSize:12, color:'#dc2626' }}>
-            <FiAlertTriangle style={{ verticalAlign: 'middle' }} /> Need at least 20 images in the training set. Currently have {trainingStats?.inTraining ?? 0}.
           </div>
         )}
       </div>
